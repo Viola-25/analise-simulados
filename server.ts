@@ -8,6 +8,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { createClient } from '@supabase/supabase-js';
+import { buildAnonymousComparisonResponse, ComparisonRecord } from './src/utils/anonymousComparison';
 
 // Load environment variables
 dotenv.config();
@@ -57,6 +58,9 @@ app.post('/api/analyze-performance', async (req, res) => {
     
 DADOS DO PERFIL DO ALUNO:
 - Nome: ${perfil?.nome || 'Estudante'}
+- Estado: ${perfil?.estado || 'Não informado'}
+- Faculdade: ${perfil?.faculdade || 'Não informada'}
+- Semestre: ${perfil?.semestre || 'Não informado'}
 - Especialidade de Interesse: ${perfil?.especialidadeAlvo || 'Não informada'}
 - Instituição Alvo: ${perfil?.instituicaoAlvo || 'Não especificada'}
 - Meta de aproveitamento geral: ${perfil?.metaAcertosPercentual || 80}%
@@ -81,6 +85,7 @@ Simulado #${index + 1}:
 `).join('\n')}
 
 Faça uma análise estatística e diagnóstica médica altamente profissional e personalizada direcionada à aprovação na residência médica de ${perfil?.instituicaoAlvo || 'grande concorrência'}.
+Responda somente em JSON válido, sem texto fora do JSON.
 Você deve fornecer:
 1. Um diagnóstico geral de evolução de estudos, considerando se há avanço ou estagnação e sugerindo um diagnóstico temporal e de gerenciamento de tempo de prova.
 2. Análise individualizada para CADA uma das 5 grandes áreas:
@@ -195,6 +200,59 @@ app.post('/api/delete-account', async (req, res) => {
   } catch (error: any) {
     console.error('Error during account deletion:', error);
     return res.status(500).json({ error: error?.message || 'Não foi possível excluir a conta no momento.' });
+  }
+});
+
+app.post('/api/compare-performance', async (req, res) => {
+  try {
+    const authorization = req.headers.authorization || '';
+    const accessToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Sessão não autenticada.' });
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+      return res.status(500).json({ error: 'Configuração do Supabase incompleta para comparação anônima.' });
+    }
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    });
+
+    const { data: userData, error: userError } = await authClient.auth.getUser(accessToken);
+    if (userError || !userData.user) {
+      return res.status(401).json({ error: 'Não foi possível validar a sessão do usuário.' });
+    }
+
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const { data, error } = await adminClient
+      .from('user_app_data')
+      .select('user_id, perfil, simulados');
+
+    if (error) {
+      throw error;
+    }
+
+    const records: ComparisonRecord[] = (data || []).map((item: any) => ({
+      user_id: item.user_id,
+      perfil: item.perfil,
+      simulados: item.simulados || [],
+    }));
+
+    const payload = buildAnonymousComparisonResponse(records, userData.user.id, (req.body?.filters || {}));
+    return res.status(200).json(payload);
+  } catch (error: any) {
+    console.error('Error during anonymous comparison:', error);
+    return res.status(500).json({ error: error?.message || 'Não foi possível gerar a comparação anônima no momento.' });
   }
 });
 

@@ -13,6 +13,7 @@ import SimuladoForm from './components/SimuladoForm';
 import PerfilForm from './components/PerfilForm';
 import CadernoErros from './components/CadernoErros';
 import AiInsights from './components/AiInsights';
+import ComparacaoAnonima from './components/ComparacaoAnonima';
 import PrintReport from './components/PrintReport';
 import AuthGate from './components/AuthGate';
 import SignupGate from './components/SignupGate';
@@ -101,6 +102,9 @@ function normalizePerfil(value: unknown): PerfilAluno | null {
   const candidate = value as Partial<PerfilAluno>;
   return {
     nome: candidate.nome || PERFIL_PADRAO.nome,
+    estado: candidate.estado || PERFIL_PADRAO.estado,
+    faculdade: candidate.faculdade || PERFIL_PADRAO.faculdade,
+    semestre: candidate.semestre || PERFIL_PADRAO.semestre,
     especialidadeAlvo: candidate.especialidadeAlvo || PERFIL_PADRAO.especialidadeAlvo,
     instituicaoAlvo: candidate.instituicaoAlvo || PERFIL_PADRAO.instituicaoAlvo,
     metaAcertosPercentual: typeof candidate.metaAcertosPercentual === 'number' ? candidate.metaAcertosPercentual : PERFIL_PADRAO.metaAcertosPercentual,
@@ -271,6 +275,9 @@ function markTutorialSeen() {
 // Dados iniciais padrões para o estudante de medicina ja iniciar com conteúdo visual
 const PERFIL_PADRAO: PerfilAluno = {
   nome: 'Seu nome',
+  estado: 'Não informado',
+  faculdade: 'Não informada',
+  semestre: 'Não informado',
   especialidadeAlvo: 'Cirurgia Geral',
   instituicaoAlvo: 'ENARE / USP-SP',
   metaAcertosPercentual: 80,
@@ -350,7 +357,7 @@ const SIMULADOS_PADRAO: Simulado[] = [
 
 export default function App() {
   const [authRoute, setAuthRoute] = useState<AuthRoute>(() => getAuthRouteFromPathname());
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'simulados' | 'erros' | 'ai' | 'perfil'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'simulados' | 'erros' | 'ai' | 'comparar' | 'perfil'>('dashboard');
   const [session, setSession] = useState<Session | null>(null);
   const [perfil, setPerfil] = useState<PerfilAluno>(PERFIL_PADRAO);
   const [simulados, setSimulados] = useState<Simulado[]>(SIMULADOS_PADRAO);
@@ -932,6 +939,14 @@ export default function App() {
               Foco com IA (Groq)
             </button>
             <button
+              onClick={() => { setActiveTab('comparar'); setShowForm(false); }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'comparar' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 border border-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              id="tab-comparar"
+            >
+              <Activity size={14} />
+              Comparação Anônima
+            </button>
+            <button
               onClick={() => { setActiveTab('perfil'); setShowForm(false); }}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'perfil' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 border border-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
               id="tab-perfil"
@@ -1089,6 +1104,17 @@ export default function App() {
                 exit={{ opacity: 0 }}
               >
                 <AiInsights simulados={simulados} perfil={perfil} />
+              </motion.div>
+            )}
+
+            {activeTab === 'comparar' && (
+              <motion.div
+                key="comparar"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                <ComparacaoAnonima perfil={perfil} accessToken={session?.access_token ?? null} />
               </motion.div>
             )}
 

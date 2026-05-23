@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { PerfilAluno } from '../types';
 import { User, Activity, GraduationCap, Target, Save, CheckCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { BR_STATES } from '../utils/brStates';
 
 interface PerfilFormProps {
   perfil: PerfilAluno;
@@ -15,6 +16,9 @@ interface PerfilFormProps {
 
 export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
   const [nome, setNome] = useState(perfil.nome);
+  const [estado, setEstado] = useState(perfil.estado);
+  const [faculdade, setFaculdade] = useState(perfil.faculdade);
+  const [semestre, setSemestre] = useState(perfil.semestre);
   const [especialidadeAlvo, setEspecialidadeAlvo] = useState(perfil.especialidadeAlvo);
   const [instituicaoAlvo, setInstituicaoAlvo] = useState(perfil.instituicaoAlvo);
   const [metaAcertosPercentual, setMetaAcertosPercentual] = useState(perfil.metaAcertosPercentual);
@@ -22,6 +26,9 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
 
   useEffect(() => {
     setNome(perfil.nome);
+    setEstado(perfil.estado);
+    setFaculdade(perfil.faculdade);
+    setSemestre(perfil.semestre);
     setEspecialidadeAlvo(perfil.especialidadeAlvo);
     setInstituicaoAlvo(perfil.instituicaoAlvo);
     setMetaAcertosPercentual(perfil.metaAcertosPercentual);
@@ -31,6 +38,9 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
     e.preventDefault();
     onSave({
       nome: nome.trim() || 'Estudante de Medicina',
+      estado: estado.trim() || 'Não informado',
+      faculdade: faculdade.trim() || 'Não informada',
+      semestre: semestre.trim() || 'Não informado',
       especialidadeAlvo: especialidadeAlvo.trim() || 'Residência Médica',
       instituicaoAlvo: instituicaoAlvo.trim() || 'Instituição Alvo',
       metaAcertosPercentual: Number(metaAcertosPercentual) || 80,
@@ -71,6 +81,61 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               placeholder="Ex: Seu nome"
+              className="w-full px-4 py-2.5 rounded-xl border border-white/10 focus:border-blue-500 focus:bg-white/8 outline-none text-white bg-white/3 transition-all text-sm placeholder-slate-500 font-sans"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5" htmlFor="estado-input">
+              <Activity size={14} className="text-slate-400" />
+              Estado
+            </label>
+            <select
+              id="estado-input"
+              value={estado}
+              onChange={(e) => setEstado(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border border-white/10 focus:border-blue-500 focus:bg-white/8 outline-none text-white bg-white/3 transition-all text-sm"
+              required
+            >
+              <option value="" className="bg-[#0f172a]">Selecione</option>
+              {BR_STATES.map((item) => (
+                <option key={item} value={item} className="bg-[#0f172a]">
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5" htmlFor="faculdade-input">
+              <GraduationCap size={14} className="text-slate-400" />
+              Faculdade
+            </label>
+            <input
+              id="faculdade-input"
+              type="text"
+              value={faculdade}
+              onChange={(e) => setFaculdade(e.target.value)}
+              placeholder="Ex: Universidade Federal de..."
+              className="w-full px-4 py-2.5 rounded-xl border border-white/10 focus:border-blue-500 focus:bg-white/8 outline-none text-white bg-white/3 transition-all text-sm placeholder-slate-500 font-sans"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5" htmlFor="semestre-input">
+              <Target size={14} className="text-slate-400" />
+              Semestre
+            </label>
+            <input
+              id="semestre-input"
+              type="number"
+              min="1"
+              max="12"
+              value={semestre}
+              onChange={(e) => setSemestre(e.target.value)}
+              placeholder="Ex: 8"
               className="w-full px-4 py-2.5 rounded-xl border border-white/10 focus:border-blue-500 focus:bg-white/8 outline-none text-white bg-white/3 transition-all text-sm placeholder-slate-500 font-sans"
               required
             />

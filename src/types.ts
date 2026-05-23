@@ -44,9 +44,62 @@ export interface Simulado {
 
 export interface PerfilAluno {
   nome: string;
+  estado: string;
+  faculdade: string;
+  semestre: string;
   especialidadeAlvo: string;
   instituicaoAlvo: string;
   metaAcertosPercentual: number; // e.g. 80 para 80%
+}
+
+export interface AnonymousComparisonFilters {
+  estado?: string | null;
+  faculdade?: string | null;
+  semestre?: string | null;
+}
+
+export interface AnonymousComparisonAreaBenchmark {
+  area: GrandeArea;
+  mediaUsuario: number;
+  mediaGrupo: number;
+  delta: number;
+}
+
+export interface AnonymousComparisonDistributionBucket {
+  faixa: string;
+  quantidade: number;
+  percentual: number;
+}
+
+export interface AnonymousComparisonResponse {
+  availableFilters: {
+    estados: string[];
+    faculdades: string[];
+    semestres: string[];
+  };
+  appliedFilters: Required<AnonymousComparisonFilters>;
+  cohort: {
+    totalUsuarios: number;
+    totalSimulados: number;
+    mediaGeral: number;
+    medianaGeral: number;
+    desvioPadrao: number;
+    melhorGeral: number;
+    piorGeral: number;
+    distribution: AnonymousComparisonDistributionBucket[];
+    areaBenchmarks: AnonymousComparisonAreaBenchmark[];
+  };
+  usuario: {
+    mediaGeral: number;
+    posicao: number;
+    totalUsuarios: number;
+    percentil: number;
+    deltaParaMedia: number;
+    simuladosConsiderados: number;
+    areaBenchmarks: AnonymousComparisonAreaBenchmark[];
+  };
+  currentUserIncluded: boolean;
+  warning?: string;
 }
 
 export interface RespostaAnaliseIA {

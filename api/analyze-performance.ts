@@ -31,6 +31,9 @@ function buildPrompt(perfil: any, simulados: Simulado[]): string {
     
 DADOS DO PERFIL DO ALUNO:
 - Nome: ${perfil?.nome || 'Estudante'}
+- Estado: ${perfil?.estado || 'Não informado'}
+- Faculdade: ${perfil?.faculdade || 'Não informada'}
+- Semestre: ${perfil?.semestre || 'Não informado'}
 - Especialidade de Interesse: ${perfil?.especialidadeAlvo || 'Não informada'}
 - Instituição Alvo: ${perfil?.instituicaoAlvo || 'Não especificada'}
 - Meta de aproveitamento geral: ${perfil?.metaAcertosPercentual || 80}%
@@ -55,6 +58,7 @@ Simulado #${index + 1}:
 `).join('\n')}
 
 Faça uma análise estatística e diagnóstica médica altamente profissional e personalizada direcionada à aprovação na residência médica de ${perfil?.instituicaoAlvo || 'grande concorrência'}.
+Responda somente em JSON válido, sem texto fora do JSON.
 Você deve fornecer:
 1. Um diagnóstico geral de evolução de estudos, considerando se há avanço ou estagnação e sugerindo um diagnóstico temporal e de gerenciamento de tempo de prova.
 2. Análise individualizada para CADA uma das 5 grandes áreas:

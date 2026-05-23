@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Loader2, Mail, Lock, User, Activity, GraduationCap, Target, ShieldCheck, ArrowLeft, UserPlus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { PerfilAluno } from '../types';
+import { BR_STATES } from '../utils/brStates';
 
 interface SignupGateProps {
   busy: boolean;
@@ -22,6 +23,9 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [nome, setNome] = useState('');
+  const [estado, setEstado] = useState('');
+  const [faculdade, setFaculdade] = useState('');
+  const [semestre, setSemestre] = useState('');
   const [especialidadeAlvo, setEspecialidadeAlvo] = useState('');
   const [instituicaoAlvo, setInstituicaoAlvo] = useState('');
   const [metaAcertosPercentual, setMetaAcertosPercentual] = useState(80);
@@ -34,8 +38,8 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
     e.preventDefault();
     setLocalError(null);
 
-    if (!email.trim() || !password.trim() || !nome.trim() || !especialidadeAlvo.trim() || !instituicaoAlvo.trim()) {
-      setLocalError('Preencha e-mail, senha e os dados iniciais do perfil para continuar.');
+    if (!email.trim() || !password.trim() || !nome.trim() || !estado.trim() || !faculdade.trim() || !semestre.trim() || !especialidadeAlvo.trim() || !instituicaoAlvo.trim()) {
+      setLocalError('Preencha e-mail, senha, estado, faculdade, semestre e os dados iniciais do perfil para continuar.');
       return;
     }
 
@@ -51,6 +55,9 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
         password,
         perfil: {
           nome: nome.trim(),
+          estado: estado.trim(),
+          faculdade: faculdade.trim(),
+          semestre: semestre.trim(),
           especialidadeAlvo: especialidadeAlvo.trim(),
           instituicaoAlvo: instituicaoAlvo.trim(),
           metaAcertosPercentual: Number(metaAcertosPercentual) || 80,
@@ -92,7 +99,7 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
             </div>
             <div className="flex items-start gap-3">
               <span className="w-2 h-2 rounded-full bg-emerald-400 mt-2 shrink-0" />
-              <p>Seu nome, especialidade, instituição e meta serão usados para montar o perfil inicial automaticamente.</p>
+              <p>Seu nome, estado, faculdade, semestre, especialidade, instituição e meta serão usados para montar o perfil inicial automaticamente.</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="w-2 h-2 rounded-full bg-amber-400 mt-2 shrink-0" />
@@ -145,6 +152,34 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
                   <User size={14} /> Nome completo
                 </span>
                 <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-emerald-500 transition-all placeholder:text-slate-500" />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                  Estado
+                </span>
+                <select value={estado} onChange={(e) => setEstado(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-emerald-500 transition-all text-sm" required>
+                  <option value="" className="bg-[#0f172a]">Selecione</option>
+                  {BR_STATES.map((item) => (
+                    <option key={item} value={item} className="bg-[#0f172a]">
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block space-y-2 md:col-span-2">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                  Faculdade
+                </span>
+                <input type="text" value={faculdade} onChange={(e) => setFaculdade(e.target.value)} placeholder="Ex: Universidade Federal de ..." className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-emerald-500 transition-all placeholder:text-slate-500" required />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                  Semestre
+                </span>
+                <input type="number" min="1" max="12" value={semestre} onChange={(e) => setSemestre(e.target.value)} placeholder="Ex: 8" className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-emerald-500 transition-all placeholder:text-slate-500" required />
               </label>
 
               <label className="block space-y-2">
