@@ -136,9 +136,10 @@ Retorne rigorosamente no formato de dados estruturado padrão fornecido.`;
     return res.json(dataParsed);
   } catch (error: any) {
     console.error('Error during AI analysis:', error);
+    const message = error?.message || String(error);
     res.status(500).json({
       error: 'Ocorreu um erro no processamento da análise de IA. Contudo, suas estatísticas locais continuam disponíveis.',
-      details: error?.message || String(error),
+      details: message,
     });
   }
 });

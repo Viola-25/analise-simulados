@@ -68,7 +68,9 @@ Retorne rigorosamente no formato de dados estruturado padrão fornecido.`;
 
 async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<RespostaAnaliseIA> {
   if (!process.env.GROQ_API_KEY) {
-    throw new Error('GROQ_API_KEY não configurada.');
+    const error = new Error('GROQ_API_KEY não configurada.');
+    error.name = 'MissingGroqApiKeyError';
+    throw error;
   }
 
   const response = await fetch(GROQ_API_URL, {
@@ -127,9 +129,13 @@ export default async function handler(req: any, res: any) {
     res.status(200).json(dataParsed);
   } catch (error: any) {
     console.error('Error during AI analysis:', error);
-    res.status(500).json({
-      error: 'Ocorreu um erro no processamento da análise de IA. Contudo, suas estatísticas locais continuam disponíveis.',
-      details: error?.message || String(error),
+    const message = error?.message || String(error);
+    const statusCode = error?.name === 'MissingGroqApiKeyError' ? 503 : 500;
+    res.status(statusCode).json({
+      error: statusCode === 503
+        ? 'A análise de IA não está disponível porque a chave da Groq não foi configurada neste ambiente.'
+        : 'Ocorreu um erro no processamento da análise de IA. Contudo, suas estatísticas locais continuam disponíveis.',
+      details: message,
     });
   }
 }

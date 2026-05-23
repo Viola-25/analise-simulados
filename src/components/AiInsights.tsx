@@ -52,8 +52,9 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro desconhecido na comunicação com a Inteligência Artificial.');
+        const errorData = await response.json().catch(() => null);
+        const details = errorData?.details ? ` Detalhes: ${errorData.details}` : '';
+        throw new Error(`${errorData?.error || 'Erro desconhecido na comunicação com a Inteligência Artificial.'}${details}`);
       }
 
       const data: RespostaAnaliseIA = await response.json();
