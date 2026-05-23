@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Loader2, Mail, Lock, User, Activity, GraduationCap, Target, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Activity, GraduationCap, Target, ShieldCheck, ArrowLeft, UserPlus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { PerfilAluno } from '../types';
 

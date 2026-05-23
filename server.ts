@@ -7,6 +7,7 @@ import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
+import { createClient } from '@supabase/supabase-js';
 
 // Load environment variables
 dotenv.config();
@@ -139,6 +140,58 @@ Retorne rigorosamente no formato de dados estruturado padrão fornecido.`;
       error: 'Ocorreu um erro no processamento da análise de IA. Contudo, suas estatísticas locais continuam disponíveis.',
       details: error?.message || String(error),
     });
+  }
+});
+
+app.post('/api/delete-account', async (req, res) => {
+  try {
+    const authorization = req.headers.authorization || '';
+    const accessToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Sessão não autenticada.' });
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+      return res.status(500).json({ error: 'Configuração do Supabase incompleta para exclusão de conta.' });
+    }
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    });
+
+    const { data: userData, error: userError } = await authClient.auth.getUser(accessToken);
+    if (userError || !userData.user) {
+      return res.status(401).json({ error: 'Não foi possível validar a sessão do usuário.' });
+    }
+
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const { error: deleteDataError } = await adminClient
+      .from('user_app_data')
+      .delete()
+      .eq('user_id', userData.user.id);
+
+    if (deleteDataError) {
+      throw deleteDataError;
+    }
+
+    const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(userData.user.id);
+    if (deleteUserError) {
+      throw deleteUserError;
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (error: any) {
+    console.error('Error during account deletion:', error);
+    return res.status(500).json({ error: error?.message || 'Não foi possível excluir a conta no momento.' });
   }
 });
 

@@ -235,7 +235,7 @@ export default function Dashboard({ simulados, perfil }: DashboardProps) {
             <span className="text-3xl font-black text-white font-mono">{stats.totalSimulados}</span>
             <span className="text-xs text-slate-400">provas</span>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Histórico total cadastrado</span>
+          <span className="text-[10px] text-slate-500 mt-1 block">Histórico total registrado</span>
         </div>
 
         <div className="glass-card p-4 rounded-2xl flex flex-col justify-between text-slate-100 transition-all duration-300" id="metric-card-questoes">

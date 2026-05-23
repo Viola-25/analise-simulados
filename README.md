@@ -22,6 +22,6 @@ View your app in AI Studio: https://ai.studio/apps/0685eef1-0abe-476a-a62a-2ef21
 
 ### Supabase
 
-For authentication and per-user storage in this Vite app, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in [.env.local](.env.local). The browser client lives in [src/utils/supabase/client.ts](src/utils/supabase/client.ts) and the optional Express session middleware is in [src/utils/supabase/middleware.ts](src/utils/supabase/middleware.ts).
+For authentication and per-user storage in this Vite app, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in [.env.local](.env.local). If you want the account deletion button to remove the Supabase Auth user too, also set `SUPABASE_SERVICE_ROLE_KEY` on the server. The browser client lives in [src/utils/supabase/client.ts](src/utils/supabase/client.ts) and the optional Express session middleware is in [src/utils/supabase/middleware.ts](src/utils/supabase/middleware.ts).
 
 Apply the SQL in [supabase-schema.sql](supabase-schema.sql) to create the `user_app_data` table and RLS policies before using login/sync.

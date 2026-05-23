@@ -17,6 +17,7 @@ import PrintReport from './components/PrintReport';
 import AuthGate from './components/AuthGate';
 import SignupGate from './components/SignupGate';
 import SignupSuccessGate from './components/SignupSuccessGate';
+import Modal from './components/Modal';
 import { createClient as createSupabaseClient, isSupabaseConfigured } from './utils/supabase/client';
 import { 
   GraduationCap, 
@@ -31,19 +32,29 @@ import {
   Activity, 
   Settings, 
   CheckCircle,
-  FileDown
+  FileDown,
+  Trash2,
+  UserRoundX,
+  CircleAlert,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const supabase = createSupabaseClient();
 const SUPABASE_TABLE = 'user_app_data';
 const ONBOARDING_STORAGE_KEY = 'med_simulados_onboarding_draft';
+const TUTORIAL_SEEN_KEY = 'med_simulados_tutorial_seen';
 const LOCAL_STORAGE_KEYS = {
   perfil: 'med_simulados_perfil',
   simulados: 'med_simulados_data',
 };
 
 type AuthRoute = 'login' | 'signup' | 'signup-success';
+type ModalState =
+  | { type: 'tutorial' }
+  | { type: 'delete-simulado'; simulado: Simulado }
+  | { type: 'delete-account' }
+  | null;
 
 function getAuthRouteFromPathname(): AuthRoute {
   if (typeof window === 'undefined') {
@@ -210,9 +221,25 @@ function clearSignupEmail() {
   sessionStorage.removeItem('med_simulados_signup_email');
 }
 
+function hasSeenTutorial() {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  return localStorage.getItem(TUTORIAL_SEEN_KEY) === 'true';
+}
+
+function markTutorialSeen() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  localStorage.setItem(TUTORIAL_SEEN_KEY, 'true');
+}
+
 // Dados iniciais padrões para o estudante de medicina ja iniciar com conteúdo visual
 const PERFIL_PADRAO: PerfilAluno = {
-  nome: 'Dra. Juliana Souza',
+  nome: 'Juliana Souza',
   especialidadeAlvo: 'Cirurgia Geral',
   instituicaoAlvo: 'ENARE / USP-SP',
   metaAcertosPercentual: 80,
@@ -307,6 +334,10 @@ export default function App() {
   const [resendBusy, setResendBusy] = useState(false);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
+  const [modalState, setModalState] = useState<ModalState>(null);
+  const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+  const [deleteAccountNotice, setDeleteAccountNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -425,6 +456,12 @@ export default function App() {
     };
   }, [session]);
 
+  useEffect(() => {
+    if (session && !authLoading && !dataLoading && !hasSeenTutorial() && !modalState) {
+      setModalState({ type: 'tutorial' });
+    }
+  }, [session, authLoading, dataLoading, modalState]);
+
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -491,9 +528,67 @@ export default function App() {
 
   // 4. Deletar Simulado
   const handleDeleteSimulado = (id: string) => {
-    const updated = simulados.filter(s => s.id !== id);
+    const updated = simulados.filter((simulado) => simulado.id !== id);
     saveSimuladosToCache(updated);
     triggerToast('Simulado removido do histórico.');
+  };
+
+  const handleImportFeedback = (message: string) => {
+    setAuthNotice(message);
+    triggerToast(message);
+  };
+
+  const handleRequestDeleteAccount = () => {
+    setDeleteAccountError(null);
+    setDeleteAccountNotice(null);
+    setModalState({ type: 'delete-account' });
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    if (!session) {
+      setDeleteAccountError('Não foi possível identificar a sessão atual.');
+      return;
+    }
+
+    setDeleteAccountBusy(true);
+    setDeleteAccountError(null);
+    setDeleteAccountNotice(null);
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error('Sessão expirada. Faça login novamente para excluir a conta.');
+      }
+
+      const response = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(result?.error ?? 'Não foi possível excluir a conta.');
+      }
+
+      setDeleteAccountNotice('Conta excluída com sucesso.');
+      await supabase.auth.signOut();
+      setModalState(null);
+      setShowForm(false);
+      setSimuladoEditando(null);
+      setActiveTab('dashboard');
+      navigateAuthRoute('login');
+      setAuthRoute('login');
+      triggerToast('Conta excluída com sucesso.');
+    } catch (error: any) {
+      setDeleteAccountError(error?.message ?? 'Não foi possível excluir a conta.');
+    } finally {
+      setDeleteAccountBusy(false);
+    }
   };
 
   // 5. Iniciar Edição
@@ -549,10 +644,10 @@ export default function App() {
               triggerToast('Importação concluída localmente, mas sem sincronização com Supabase.');
             });
         } else {
-          alert('Arquivo inválido. Formato incompatível de prontuário.');
+          handleImportFeedback('Arquivo inválido. Formato incompatível de prontuário.');
         }
       } catch (err) {
-        alert('Falha ao decodificar JSON de backup.');
+        handleImportFeedback('Falha ao decodificar JSON de backup.');
       }
     };
     reader.readAsText(file);
@@ -723,11 +818,11 @@ export default function App() {
 
           <div className="flex flex-wrap items-center gap-4 bg-white/5 border border-white/10 p-3 rounded-2xl backdrop-blur-md" id="header-student-profile-info">
             <div className="text-xs">
-              <span className="text-slate-400 font-medium block">Candidato</span>
+              <span className="text-slate-400 font-medium block">Perfil</span>
               <span className="font-bold text-white pr-2 border-r border-white/10">{perfil.nome}</span>
             </div>
             <div className="text-xs">
-              <span className="text-slate-400 font-medium block">Dream Institution</span>
+              <span className="text-slate-400 font-medium block">Instituição-alvo</span>
               <span className="font-bold text-emerald-400 pr-2 border-r border-white/10">{perfil.instituicaoAlvo}</span>
             </div>
             <div className="text-xs">
@@ -745,6 +840,13 @@ export default function App() {
               className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-semibold transition-all"
             >
               Sair
+            </button>
+            <button
+              onClick={handleRequestDeleteAccount}
+              className="px-3 py-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 text-xs font-semibold transition-all flex items-center gap-1.5"
+            >
+              <UserRoundX size={14} />
+              Excluir conta
             </button>
           </div>
         </div>
@@ -879,7 +981,7 @@ export default function App() {
                       Ficha de Desempenho
                     </h2>
                     <p className="text-xs text-slate-300 leading-relaxed max-w-xl">
-                      Dra. {perfil.nome}, bem-vinda de volta ao painel de balanceamento clínico. Você está cadastrada no escopo ativo de concorrência para a especialidade de <span className="font-extrabold text-white underline">{perfil.especialidadeAlvo}</span> na instituição <span className="font-extrabold text-white underline">{perfil.instituicaoAlvo}</span>, cuja meta estipulada é atingir <span className="font-extrabold text-blue-400 font-mono text-sm">{perfil.metaAcertosPercentual}%</span>.
+                      Olá, {perfil.nome}. Seu painel está pronto para acompanhar a especialidade de <span className="font-extrabold text-white underline">{perfil.especialidadeAlvo}</span> na instituição <span className="font-extrabold text-white underline">{perfil.instituicaoAlvo}</span>, com meta de <span className="font-extrabold text-blue-400 font-mono text-sm">{perfil.metaAcertosPercentual}%</span> de acertos.
                     </p>
                   </div>
                   <button
@@ -919,7 +1021,7 @@ export default function App() {
 
                 <SimuladosList
                   simulados={simulados}
-                  onDelete={handleDeleteSimulado}
+                  onRequestDelete={(simulado) => setModalState({ type: 'delete-simulado', simulado })}
                   onEdit={handleEditSimuladoClick}
                   onAddNew={() => { setShowForm(true); setSimuladoEditando(null); }}
                 />
@@ -969,6 +1071,112 @@ export default function App() {
           <span>{session ? 'DADOS SINCRONIZADOS COM SUPABASE' : 'DADOS CRIPTOGRAFADOS E SALVOS LOCALMENTE'}</span>
         </div>
       </footer>
+
+      <Modal
+        open={modalState?.type === 'tutorial'}
+        title="Boas-vindas à plataforma"
+        description="Este aviso aparece só no primeiro acesso para orientar os passos iniciais."
+        onClose={() => {
+          markTutorialSeen();
+          setModalState(null);
+        }}
+      >
+        <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
+          <p>1. Comece preenchendo ou revisando o perfil para refletir sua meta real.</p>
+          <p>2. Registre simulados para acompanhar evolução, áreas fracas e percentis.</p>
+          <p>3. Use o caderno de erros e a análise por IA para organizar os próximos estudos.</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <Sparkles size={14} className="text-blue-400" />
+            Dica: exporte o prontuário antes de trocar de dispositivo.
+          </div>
+          <button
+            onClick={() => {
+              markTutorialSeen();
+              setModalState(null);
+            }}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-all"
+          >
+            Entendi
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={modalState?.type === 'delete-simulado'}
+        title="Excluir simulado"
+        description="Essa ação remove o registro escolhido do histórico e da sincronização."
+        onClose={() => setModalState(null)}
+      >
+        <div className="space-y-4 text-sm text-slate-300 leading-relaxed">
+          <div className="flex items-start gap-3 rounded-2xl border border-rose-500/15 bg-rose-500/8 p-4">
+            <CircleAlert size={18} className="text-rose-300 shrink-0 mt-0.5" />
+            <p>Você está prestes a excluir <span className="font-bold text-white">{modalState?.type === 'delete-simulado' ? modalState.simulado.nome : ''}</span>. A ação não pode ser desfeita.</p>
+          </div>
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              onClick={() => setModalState(null)}
+              className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200 text-sm font-semibold transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                if (modalState?.type === 'delete-simulado') {
+                  handleDeleteSimulado(modalState.simulado.id);
+                }
+                setModalState(null);
+              }}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-all flex items-center gap-2"
+            >
+              <Trash2 size={14} />
+              Excluir simulado
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={modalState?.type === 'delete-account'}
+        title="Excluir conta"
+        description="Isso remove os dados da plataforma e solicita a exclusão da autenticação da conta."
+        onClose={() => setModalState(null)}
+      >
+        <div className="space-y-4 text-sm text-slate-300 leading-relaxed">
+          <div className="rounded-2xl border border-amber-500/15 bg-amber-500/8 p-4 space-y-2">
+            <p className="font-semibold text-amber-100">Antes de continuar</p>
+            <p>Se a exclusão for concluída, a sessão será encerrada e você precisará criar uma nova conta para voltar a usar a plataforma.</p>
+          </div>
+          {deleteAccountError && (
+            <div className="rounded-2xl border border-rose-500/15 bg-rose-500/8 p-4 text-rose-100 text-sm">
+              {deleteAccountError}
+            </div>
+          )}
+          {deleteAccountNotice && (
+            <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/8 p-4 text-emerald-100 text-sm">
+              {deleteAccountNotice}
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              onClick={() => setModalState(null)}
+              disabled={deleteAccountBusy}
+              className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200 text-sm font-semibold transition-all disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => void handleConfirmDeleteAccount()}
+              disabled={deleteAccountBusy}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              <UserRoundX size={14} />
+              {deleteAccountBusy ? 'Excluindo...' : 'Excluir conta'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -282,7 +282,7 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
         {simulados.length === 0 && (
           <div className="glass-panel-heavy p-12 rounded-2xl border border-white/10 text-center space-y-3 shadow-xl text-slate-200">
             <ShieldAlert size={40} className="text-slate-500 mx-auto" />
-            <h4 className="text-sm font-bold text-slate-300 font-sans">Nenhum simulado cadastrado ainda!</h4>
+            <h4 className="text-sm font-bold text-slate-300 font-sans">Nenhum simulado registrado ainda!</h4>
             <p className="text-xs text-slate-400 max-w-sm mx-auto font-sans">
               Cadastre o seu primeiro simulado médico para destravar a triagem diagnóstica por inteligência artificial.
             </p>

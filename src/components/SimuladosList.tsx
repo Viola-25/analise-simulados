@@ -10,12 +10,12 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface SimuladosListProps {
   simulados: Simulado[];
-  onDelete: (id: string) => void;
+  onRequestDelete: (simulado: Simulado) => void;
   onEdit: (simulado: Simulado) => void;
   onAddNew: () => void;
 }
 
-export default function SimuladosList({ simulados, onDelete, onEdit, onAddNew }: SimuladosListProps) {
+export default function SimuladosList({ simulados, onRequestDelete, onEdit, onAddNew }: SimuladosListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'data-desc' | 'data-asc' | 'aproveitamento-desc' | 'aproveitamento-asc'>('data-desc');
@@ -83,7 +83,7 @@ export default function SimuladosList({ simulados, onDelete, onEdit, onAddNew }:
       {filteredAndSorted.length === 0 ? (
         <div className="glass-panel-heavy p-12 rounded-2xl text-center space-y-4 shadow-xl">
           <Calendar size={40} className="text-slate-500 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-300">Nenhum simulado cadastrado!</h3>
+          <h3 className="text-sm font-bold text-slate-300">Nenhum simulado registrado!</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto font-sans">
             {searchTerm ? 'Nenhum simulado corresponde à sua pesquisa.' : 'Comece registrando o seu primeiro simulado médico para destrinchar suas estatísticas.'}
           </p>
@@ -157,9 +157,7 @@ export default function SimuladosList({ simulados, onDelete, onEdit, onAddNew }:
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Tem certeza de que deseja excluir o simulado "${sim.nome}"? Esta operação é irreversível.`)) {
-                            onDelete(sim.id);
-                          }
+                          onRequestDelete(sim);
                         }}
                         className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/5"
                         title="Excluir simulado"
@@ -259,11 +257,11 @@ export default function SimuladosList({ simulados, onDelete, onEdit, onAddNew }:
                                   </>
                                 ) : sim.posicaoRanking !== undefined ? (
                                   <>
-                                    Seu ranking real cadastrado: posição <span className="font-bold text-white">{sim.posicaoRanking}°</span>.
+                                    Seu ranking real registrado: posição <span className="font-bold text-white">{sim.posicaoRanking}°</span>.
                                   </>
                                 ) : (
                                   <>
-                                    O ranking oficial e número total de participantes não foram cadastrados para este simulado.
+                                    O ranking oficial e o número total de participantes não foram informados para este simulado.
                                   </>
                                 )}
                               </p>

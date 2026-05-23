@@ -129,7 +129,7 @@ export default function PrintReport({ simulados, perfil }: PrintReportProps) {
       {/* 5. Histórico da Bateria de Exames */}
       <div className="space-y-3">
         <h3 className="text-sm font-extrabold uppercase tracking-wide border-b border-slate-200 pb-1 flex items-center gap-1">
-          <Calendar size={14} className="text-slate-800" /> III. Histórico Cronológico de Provas Cadastradas
+          <Calendar size={14} className="text-slate-800" /> III. Histórico Cronológico de Provas Registradas
         </h3>
         <table className="w-full text-left border-collapse border border-slate-200" id="print-history-table">
           <thead>

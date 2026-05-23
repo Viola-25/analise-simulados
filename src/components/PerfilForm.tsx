@@ -53,8 +53,8 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
           <GraduationCap size={24} />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-slate-100 uppercase tracking-wider" id="perfil-title">Configurações do Perfil do Interno</h2>
-          <p className="text-xs text-slate-400" id="perfil-subtitle">Adapte a plataforma com base nos seus objetivos para a Residência Médica</p>
+          <h2 className="text-lg font-bold text-slate-100 uppercase tracking-wider" id="perfil-title">Configurações do Perfil</h2>
+          <p className="text-xs text-slate-400" id="perfil-subtitle">Adapte a plataforma com base nos seus objetivos para a residência médica</p>
         </div>
       </div>
 
@@ -70,7 +70,7 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
               type="text"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Dra. Juliana Souza"
+              placeholder="Ex: Juliana Souza"
               className="w-full px-4 py-2.5 rounded-xl border border-white/10 focus:border-blue-500 focus:bg-white/8 outline-none text-white bg-white/3 transition-all text-sm placeholder-slate-500 font-sans"
               required
             />
@@ -95,7 +95,7 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5" htmlFor="instituicao-input">
               <GraduationCap size={14} className="text-slate-400" />
-              Instituição Alvo (Sonho)
+              Instituição-alvo
             </label>
             <input
               id="instituicao-input"
