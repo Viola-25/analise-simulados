@@ -270,7 +270,7 @@ function markTutorialSeen() {
 
 // Dados iniciais padrões para o estudante de medicina ja iniciar com conteúdo visual
 const PERFIL_PADRAO: PerfilAluno = {
-  nome: 'Juliana Souza',
+  nome: 'Seu nome',
   especialidadeAlvo: 'Cirurgia Geral',
   instituicaoAlvo: 'ENARE / USP-SP',
   metaAcertosPercentual: 80,
@@ -385,7 +385,6 @@ export default function App() {
 
   useEffect(() => {
     if (session) {
-      clearOnboardingDraft();
       clearSignupEmail();
     }
   }, [session]);
@@ -450,6 +449,7 @@ export default function App() {
             setSimulados(loadedSimulados);
           }
           writeCachedData(session.user.id, loadedPerfil, loadedSimulados);
+          clearOnboardingDraft();
           return;
         }
 
@@ -468,6 +468,8 @@ export default function App() {
         if (upsertError) {
           throw upsertError;
         }
+
+        clearOnboardingDraft();
       } catch (error: any) {
         console.error('Falha ao carregar dados do Supabase', error);
         if (!cancelled) {

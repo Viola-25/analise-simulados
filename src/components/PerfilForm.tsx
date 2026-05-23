@@ -70,7 +70,7 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
               type="text"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Juliana Souza"
+              placeholder="Ex: Seu nome"
               className="w-full px-4 py-2.5 rounded-xl border border-white/10 focus:border-blue-500 focus:bg-white/8 outline-none text-white bg-white/3 transition-all text-sm placeholder-slate-500 font-sans"
               required
             />
@@ -138,7 +138,7 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
 
         <div className="flex items-center justify-between border-t border-white/10 pt-6">
           <div className="flex items-center gap-1 text-[11px] text-slate-500 font-sans">
-            <span>Última modificação salva localmente no navegador</span>
+            <span>Última modificação sincronizada com sua conta</span>
           </div>
           
           <button
