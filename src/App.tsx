@@ -221,6 +221,37 @@ function clearSignupEmail() {
   sessionStorage.removeItem('med_simulados_signup_email');
 }
 
+function translateSupabaseAuthError(error: { message?: string; code?: string } | null | undefined, fallback = 'Não foi possível concluir a autenticação.') {
+  const message = (error?.message ?? '').toLowerCase();
+  const code = (error?.code ?? '').toLowerCase();
+
+  if (code === 'invalid_login_credentials' || message.includes('invalid login credentials')) {
+    return 'E-mail ou senha inválidos.';
+  }
+
+  if (code === 'email_not_confirmed' || message.includes('email not confirmed')) {
+    return 'Confirme seu e-mail antes de entrar.';
+  }
+
+  if (message.includes('user already registered') || message.includes('user already exists')) {
+    return 'Já existe uma conta com esse e-mail.';
+  }
+
+  if (message.includes('invalid email')) {
+    return 'Digite um e-mail válido.';
+  }
+
+  if (message.includes('password') && message.includes('least')) {
+    return 'A senha informada não atende ao mínimo exigido.';
+  }
+
+  if (code === 'too_many_requests' || message.includes('too many requests') || message.includes('rate limit')) {
+    return 'Muitas tentativas em sequência. Aguarde alguns minutos e tente novamente.';
+  }
+
+  return error?.message || fallback;
+}
+
 function hasSeenTutorial() {
   if (typeof window === 'undefined') {
     return true;
@@ -338,6 +369,10 @@ export default function App() {
   const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
   const [deleteAccountNotice, setDeleteAccountNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.title = 'MedAnalysis Pro';
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -585,7 +620,12 @@ export default function App() {
       setAuthRoute('login');
       triggerToast('Conta excluída com sucesso.');
     } catch (error: any) {
-      setDeleteAccountError(error?.message ?? 'Não foi possível excluir a conta.');
+      const message = error?.message ?? 'Não foi possível excluir a conta.';
+      if (message.includes('SUPABASE_SERVICE_ROLE_KEY') || message.includes('não está ativada neste ambiente')) {
+        setDeleteAccountError('A exclusão de conta ainda não foi ativada neste ambiente. Os dados continuam sincronizando normalmente; para habilitar essa ação, configure SUPABASE_SERVICE_ROLE_KEY no servidor.');
+      } else {
+        setDeleteAccountError(message);
+      }
     } finally {
       setDeleteAccountBusy(false);
     }
@@ -665,7 +705,7 @@ export default function App() {
     setAuthNotice(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setAuthError(error.message);
+      setAuthError(translateSupabaseAuthError(error, 'Não foi possível entrar com essa conta.'));
       return;
     }
   };
@@ -679,7 +719,7 @@ export default function App() {
     saveSignupEmail(payload.email);
     const { error } = await supabase.auth.signUp({ email: payload.email, password: payload.password });
     if (error) {
-      setAuthError(error.message);
+      setAuthError(translateSupabaseAuthError(error, 'Não foi possível criar a conta.'));
       return;
     }
     setAuthNotice('Conta criada. Se o Supabase estiver com confirmação de e-mail ativa, verifique sua caixa de entrada para concluir o acesso.');
@@ -703,7 +743,7 @@ export default function App() {
     });
 
     if (error) {
-      setResendError(error.message);
+      setResendError(translateSupabaseAuthError(error, 'Não foi possível reenviar o e-mail de confirmação.'));
     } else {
       setResendNotice('E-mail de confirmação reenviado. Verifique inbox, promoções e spam.');
     }

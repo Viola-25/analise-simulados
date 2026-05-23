@@ -157,7 +157,9 @@ app.post('/api/delete-account', async (req, res) => {
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-      return res.status(500).json({ error: 'Configuração do Supabase incompleta para exclusão de conta.' });
+      return res.status(500).json({
+        error: 'A exclusão de conta ainda não está ativada neste ambiente. Configure SUPABASE_SERVICE_ROLE_KEY no servidor para habilitar essa ação. A sincronização normal dos dados continua funcionando.',
+      });
     }
 
     const authClient = createClient(supabaseUrl, supabaseAnonKey, {
