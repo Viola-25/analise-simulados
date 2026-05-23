@@ -77,18 +77,23 @@ function collectDistinctValues(records: ComparisonRecord[], selector: (perfil: P
   const seen = new Map<string, string>();
 
   records.forEach((record) => {
-    const rawValue = selector(record.perfil).trim();
-    if (!rawValue) {
+    const rawValue = selector(record.perfil);
+    if (typeof rawValue !== 'string') {
       return;
     }
 
-    const key = normalizeText(rawValue);
+    const trimmedValue = rawValue.trim();
+    if (!trimmedValue) {
+      return;
+    }
+
+    const key = normalizeText(trimmedValue);
     if (!key || key === 'não informado' || key === 'nao informado') {
       return;
     }
 
     if (!seen.has(key)) {
-      seen.set(key, rawValue);
+      seen.set(key, trimmedValue);
     }
   });
 
@@ -104,14 +109,27 @@ function getUserStats(record: ComparisonRecord): UserStats {
     'Medicina Preventiva': { acertos: 0, total: 0 },
   };
 
-  const scores = record.simulados
-    .map((simulado) => simulado.percentualAcertos)
+  const simulados = Array.isArray(record.simulados) ? record.simulados : [];
+
+  const scores = simulados
+    .map((simulado) => Number(simulado?.percentualAcertos))
     .filter((value) => Number.isFinite(value));
 
-  record.simulados.forEach((simulado) => {
-    Object.entries(simulado.desempenhoAreas).forEach(([area, desempenho]) => {
-      areaTotals[area as GrandeArea].acertos += desempenho.acertos;
-      areaTotals[area as GrandeArea].total += desempenho.total;
+  simulados.forEach((simulado) => {
+    const desempenhoAreas = simulado?.desempenhoAreas;
+
+    if (!desempenhoAreas || typeof desempenhoAreas !== 'object') {
+      return;
+    }
+
+    Object.entries(desempenhoAreas).forEach(([area, desempenho]) => {
+      if (!(area in areaTotals) || !desempenho || typeof desempenho !== 'object') {
+        return;
+      }
+
+      const areaStats = areaTotals[area as GrandeArea];
+      areaStats.acertos += Number((desempenho as { acertos?: number }).acertos || 0);
+      areaStats.total += Number((desempenho as { total?: number }).total || 0);
     });
   });
 
@@ -174,9 +192,10 @@ export function buildAnonymousComparisonResponse(records: ComparisonRecord[], cu
   const currentUserStats = allUserStats.find((item) => item.user_id === currentUserId);
 
   const cohortRecords = records.filter((record) => {
-    const estado = normalizeText(record.perfil.estado);
-    const faculdade = normalizeText(record.perfil.faculdade);
-    const semestre = normalizeText(record.perfil.semestre);
+    const perfil = record.perfil || ({} as PerfilAluno);
+    const estado = normalizeText(perfil.estado);
+    const faculdade = normalizeText(perfil.faculdade);
+    const semestre = normalizeText(perfil.semestre);
 
     const estadoMatches = !normalizedFilters.estado || estado === normalizeText(normalizedFilters.estado);
     const faculdadeMatches = !normalizedFilters.faculdade || faculdade === normalizeText(normalizedFilters.faculdade);
