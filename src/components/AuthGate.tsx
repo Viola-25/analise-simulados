@@ -11,27 +11,24 @@ interface AuthGateProps {
   busy: boolean;
   error: string | null;
   configError?: string | null;
+  notice?: string | null;
   onSignIn: (email: string, password: string) => Promise<void>;
-  onSignUp: (email: string, password: string) => Promise<void>;
+  onGoToSignUp: () => void;
 }
 
-export default function AuthGate({ busy, error, configError, onSignIn, onSignUp }: AuthGateProps) {
+export default function AuthGate({ busy, error, configError, notice, onSignIn, onGoToSignUp }: AuthGateProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [localBusy, setLocalBusy] = useState<'signin' | 'signup' | null>(null);
 
-  const runAction = async (action: 'signin' | 'signup') => {
+  const runAction = async () => {
     if (!email.trim() || !password.trim()) {
       return;
     }
 
-    setLocalBusy(action);
+    setLocalBusy('signin');
     try {
-      if (action === 'signin') {
-        await onSignIn(email.trim(), password);
-      } else {
-        await onSignUp(email.trim(), password);
-      }
+      await onSignIn(email.trim(), password);
     } finally {
       setLocalBusy(null);
     }
@@ -129,10 +126,16 @@ export default function AuthGate({ busy, error, configError, onSignIn, onSignUp 
             </div>
           )}
 
+          {notice && (
+            <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-950/20 px-4 py-3 text-xs text-emerald-200 leading-relaxed">
+              {notice}
+            </div>
+          )}
+
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => void runAction('signin')}
+              onClick={() => void runAction()}
               disabled={submitting}
               className="px-4 py-3 rounded-xl border border-blue-500/20 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
@@ -141,11 +144,11 @@ export default function AuthGate({ busy, error, configError, onSignIn, onSignUp 
             </button>
             <button
               type="button"
-              onClick={() => void runAction('signup')}
+              onClick={onGoToSignUp}
               disabled={submitting}
               className="px-4 py-3 rounded-xl border border-emerald-500/20 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {submitting && localBusy === 'signup' ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+              <UserPlus size={16} />
               Criar conta
             </button>
           </div>

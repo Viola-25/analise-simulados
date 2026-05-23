@@ -15,6 +15,8 @@ import CadernoErros from './components/CadernoErros';
 import AiInsights from './components/AiInsights';
 import PrintReport from './components/PrintReport';
 import AuthGate from './components/AuthGate';
+import SignupGate from './components/SignupGate';
+import SignupSuccessGate from './components/SignupSuccessGate';
 import { createClient as createSupabaseClient, isSupabaseConfigured } from './utils/supabase/client';
 import { 
   GraduationCap, 
@@ -35,10 +37,39 @@ import { motion, AnimatePresence } from 'motion/react';
 
 const supabase = createSupabaseClient();
 const SUPABASE_TABLE = 'user_app_data';
+const ONBOARDING_STORAGE_KEY = 'med_simulados_onboarding_draft';
 const LOCAL_STORAGE_KEYS = {
   perfil: 'med_simulados_perfil',
   simulados: 'med_simulados_data',
 };
+
+type AuthRoute = 'login' | 'signup' | 'signup-success';
+
+function getAuthRouteFromPathname(): AuthRoute {
+  if (typeof window === 'undefined') {
+    return 'login';
+  }
+
+  const pathname = window.location.pathname.toLowerCase();
+  if (pathname.includes('signup-success')) {
+    return 'signup-success';
+  }
+
+  return pathname.includes('signup') ? 'signup' : 'login';
+}
+
+function navigateAuthRoute(route: AuthRoute, replace = false) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const nextPath = route === 'signup' ? '/signup' : route === 'signup-success' ? '/signup-success' : '/login';
+  if (replace) {
+    window.history.replaceState({}, '', nextPath);
+  } else {
+    window.history.pushState({}, '', nextPath);
+  }
+}
 
 function getStorageKeys(userId?: string) {
   if (!userId) {
@@ -122,6 +153,63 @@ function writeCachedData(userId: string | undefined, perfil: PerfilAluno, simula
   localStorage.setItem(keys.simulados, JSON.stringify(simulados));
 }
 
+function readOnboardingDraft(): PerfilAluno | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const raw = sessionStorage.getItem(ONBOARDING_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return normalizePerfil(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+function saveOnboardingDraft(perfil: PerfilAluno) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  sessionStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(perfil));
+}
+
+function clearOnboardingDraft() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  sessionStorage.removeItem(ONBOARDING_STORAGE_KEY);
+}
+
+function saveSignupEmail(email: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  sessionStorage.setItem('med_simulados_signup_email', email);
+}
+
+function readSignupEmail() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return sessionStorage.getItem('med_simulados_signup_email');
+}
+
+function clearSignupEmail() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  sessionStorage.removeItem('med_simulados_signup_email');
+}
+
 // Dados iniciais padrões para o estudante de medicina ja iniciar com conteúdo visual
 const PERFIL_PADRAO: PerfilAluno = {
   nome: 'Dra. Juliana Souza',
@@ -203,6 +291,7 @@ const SIMULADOS_PADRAO: Simulado[] = [
 ];
 
 export default function App() {
+  const [authRoute, setAuthRoute] = useState<AuthRoute>(() => getAuthRouteFromPathname());
   const [activeTab, setActiveTab] = useState<'dashboard' | 'simulados' | 'erros' | 'ai' | 'perfil'>('dashboard');
   const [session, setSession] = useState<Session | null>(null);
   const [perfil, setPerfil] = useState<PerfilAluno>(PERFIL_PADRAO);
@@ -213,6 +302,27 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [signupEmail, setSignupEmail] = useState<string | null>(() => readSignupEmail());
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setAuthRoute(getAuthRouteFromPathname());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (session) {
+      clearOnboardingDraft();
+      clearSignupEmail();
+    }
+  }, [session]);
 
   useEffect(() => {
     let cancelled = false;
@@ -263,6 +373,7 @@ export default function App() {
         }
 
         const cached = readCachedData(session.user.id);
+        const onboardingDraft = readOnboardingDraft();
 
         if (data) {
           const loadedPerfil = normalizePerfil(data.perfil) ?? cached.perfil;
@@ -277,13 +388,13 @@ export default function App() {
         }
 
         if (!cancelled) {
-          setPerfil(cached.perfil);
+          setPerfil(onboardingDraft ?? cached.perfil);
           setSimulados(cached.simulados);
         }
 
         const { error: upsertError } = await supabase.from(SUPABASE_TABLE).upsert({
           user_id: session.user.id,
-          perfil: cached.perfil,
+          perfil: onboardingDraft ?? cached.perfil,
           simulados: cached.simulados,
           updated_at: new Date().toISOString(),
         });
@@ -296,7 +407,8 @@ export default function App() {
         if (!cancelled) {
           setAuthError('Não foi possível carregar os dados do seu perfil no Supabase.');
           const cached = readCachedData(session.user.id);
-          setPerfil(cached.perfil);
+          const onboardingDraftFallback = readOnboardingDraft();
+          setPerfil(onboardingDraftFallback ?? cached.perfil);
           setSimulados(cached.simulados);
         }
       } finally {
@@ -455,6 +567,7 @@ export default function App() {
 
   const handleSignIn = async (email: string, password: string) => {
     setAuthError(null);
+    setAuthNotice(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setAuthError(error.message);
@@ -462,14 +575,45 @@ export default function App() {
     }
   };
 
-  const handleSignUp = async (email: string, password: string) => {
+  const handleSignUp = async (payload: { email: string; password: string; perfil: PerfilAluno }) => {
     setAuthError(null);
-    const { error } = await supabase.auth.signUp({ email, password });
+    setAuthNotice(null);
+    setResendNotice(null);
+    setResendError(null);
+    saveOnboardingDraft(payload.perfil);
+    saveSignupEmail(payload.email);
+    const { error } = await supabase.auth.signUp({ email: payload.email, password: payload.password });
     if (error) {
       setAuthError(error.message);
       return;
     }
-    triggerToast('Conta criada. Se o Supabase exigir confirmação por e-mail, verifique sua caixa de entrada.');
+    setAuthNotice('Conta criada. Se o Supabase estiver com confirmação de e-mail ativa, verifique sua caixa de entrada para concluir o acesso.');
+    navigateAuthRoute('signup-success');
+    setAuthRoute('signup-success');
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!signupEmail) {
+      setResendError('Não há e-mail salvo para reenviar a confirmação.');
+      return;
+    }
+
+    setResendBusy(true);
+    setResendError(null);
+    setResendNotice(null);
+
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: signupEmail,
+    });
+
+    if (error) {
+      setResendError(error.message);
+    } else {
+      setResendNotice('E-mail de confirmação reenviado. Verifique inbox, promoções e spam.');
+    }
+
+    setResendBusy(false);
   };
 
   const handleSignOut = async () => {
@@ -498,13 +642,56 @@ export default function App() {
   }
 
   if (!session) {
+    if (authRoute === 'signup') {
+      return (
+        <SignupGate
+          busy={false}
+          error={authError}
+          notice={authNotice}
+          configError={isSupabaseConfigured ? null : 'As variáveis do Supabase não foram embutidas no build. Na Vercel, use VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY em Production e faça novo deploy.'}
+          onBackToLogin={() => {
+            setAuthError(null);
+            setAuthNotice(null);
+            navigateAuthRoute('login');
+            setAuthRoute('login');
+          }}
+          onSignUp={handleSignUp}
+        />
+      );
+    }
+
+    if (authRoute === 'signup-success') {
+      return (
+        <SignupSuccessGate
+          email={signupEmail}
+          notice={authNotice}
+          resendBusy={resendBusy}
+          resendNotice={resendNotice}
+          resendError={resendError}
+          onBackToLogin={() => {
+            setAuthError(null);
+            setAuthNotice(null);
+            navigateAuthRoute('login');
+            setAuthRoute('login');
+          }}
+          onResendConfirmation={() => void handleResendConfirmation()}
+        />
+      );
+    }
+
     return (
       <AuthGate
         busy={false}
         error={authError}
         configError={isSupabaseConfigured ? null : 'As variáveis do Supabase não foram embutidas no build. Na Vercel, use VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY em Production e faça novo deploy.'}
+        notice={authNotice}
         onSignIn={handleSignIn}
-        onSignUp={handleSignUp}
+        onGoToSignUp={() => {
+          setAuthError(null);
+          setAuthNotice(null);
+          navigateAuthRoute('signup');
+          setAuthRoute('signup');
+        }}
       />
     );
   }
