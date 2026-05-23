@@ -1,0 +1,6 @@
+{
+  "name": "Análise de Simulados de Medicina",
+  "description": "Plataforma para registro, análise de desempenho de simulados e identificação de pontos fracos baseando-se nas grandes áreas da medicina para candidatos à Residência Médica.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
