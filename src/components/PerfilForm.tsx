@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PerfilAluno } from '../types';
 import { User, Activity, GraduationCap, Target, Save, CheckCircle } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -19,6 +19,13 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
   const [instituicaoAlvo, setInstituicaoAlvo] = useState(perfil.instituicaoAlvo);
   const [metaAcertosPercentual, setMetaAcertosPercentual] = useState(perfil.metaAcertosPercentual);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setNome(perfil.nome);
+    setEspecialidadeAlvo(perfil.especialidadeAlvo);
+    setInstituicaoAlvo(perfil.instituicaoAlvo);
+    setMetaAcertosPercentual(perfil.metaAcertosPercentual);
+  }, [perfil]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -120,7 +120,7 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
               Check-up Pedagógico via Inteligência Artificial
             </h2>
             <p className="text-xs text-slate-400">
-              O Gemini analisa seus pontos fracos históricos por disciplina e monta um plano de revisão ativa focado na concorrência da sua instituição alvo: <span className="font-bold text-blue-400">{perfil.instituicaoAlvo}</span>.
+              A Groq analisa seus pontos fracos históricos por disciplina e monta um plano de revisão ativa focado na concorrência da sua instituição alvo: <span className="font-bold text-blue-400">{perfil.instituicaoAlvo}</span>.
             </p>
           </div>
         </div>
@@ -180,7 +180,7 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
                 <Target size={16} className="text-blue-400" /> Diagnóstico de Tendência e Gestão Pedagógica
               </h3>
               <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-line font-sans border-l-4 border-blue-500 pl-4 py-1 italic">
-                {analise.diagnosticoGeral}
+                  {analise.diagnosticoGeral}
               </div>
             </div>
 
@@ -274,7 +274,7 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
             <Brain size={40} className="text-blue-400 mx-auto animate-bounce" />
             <h3 className="text-sm font-bold text-slate-100">Seu perfil pedagógico está pronto para diagnóstico!</h3>
             <p className="text-xs text-slate-400 max-w-sm mx-auto font-sans">
-              Clique no botão "Solicitar Diagnóstico IA" acima para fazer o check-up integral dos seus simulados e receber uma análise e planejamento de medicina elaborados sob medida pelo Gemini.
+              Clique no botão "Solicitar Diagnóstico IA" acima para fazer o check-up integral dos seus simulados e receber uma análise e planejamento de medicina elaborados sob medida pela Groq.
             </p>
           </motion.div>
         )}

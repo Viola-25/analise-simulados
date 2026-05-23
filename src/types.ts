@@ -59,3 +59,10 @@ export interface RespostaAnaliseIA {
   }[];
   planoDeAcao: string[];
 }
+
+export interface UserAppDataRecord {
+  user_id: string;
+  perfil: PerfilAluno;
+  simulados: Simulado[];
+  updated_at?: string;
+}

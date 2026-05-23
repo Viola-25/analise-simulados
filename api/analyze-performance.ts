@@ -3,20 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import express from 'express';
-import path from 'path';
-import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
+import { GrandeArea, RespostaAnaliseIA, Simulado } from '../src/types';
 
-// Load environment variables
-dotenv.config();
-
-const app = express();
-const PORT = 3000;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-
-app.use(express.json());
 
 const systemInstruction = `Você é um professor e mentor especialista na preparação para a Residência Médica (equivalente a um coordenador pedagógico de grandes cursinhos como Medgrupo, Medcel, Sanar, Afya, etc.).
 Sua missão é dar uma análise diagnóstica extremamente acolhedora porém exigente e cientificamente embasada em evidências de medicina e andragogia para aprovação do interno no final do ano na especialidade alvo dele.
@@ -36,23 +26,8 @@ function extractJsonPayload(content: string): string {
   return trimmed;
 }
 
-// REST API endpoint for AI performance analysis
-app.post('/api/analyze-performance', async (req, res) => {
-  if (!process.env.GROQ_API_KEY) {
-    return res.status(503).json({
-      error: 'O serviço de Inteligência Artificial não está disponível no momento (chave da Groq ausente).',
-    });
-  }
-
-  try {
-    const { perfil, simulados } = req.body;
-
-    if (!simulados || !Array.isArray(simulados) || simulados.length === 0) {
-      return res.status(400).json({ error: 'Nenhum simulado fornecido para análise.' });
-    }
-
-    // Prepare a concise descriptive content for the prompt
-    const promptString = `Abaixo estão os dados de desempenho de um estudante do último ano de medicina (Internato) se preparando para a Residência Médica.
+function buildPrompt(perfil: any, simulados: Simulado[]): string {
+  return `Abaixo estão os dados de desempenho de um estudante do último ano de medicina (Internato) se preparando para a Residência Médica.
     
 DADOS DO PERFIL DO ALUNO:
 - Nome: ${perfil?.nome || 'Estudante'}
@@ -89,50 +64,67 @@ Você deve fornecer:
 3. Um plano de ação claro com 4-5 passos práticos específicos de metodologia de estudo ativo (ex: flashcards, engenharia reversa por questões, revisões espaçadas baseadas no caderno de erros) focado em alavancar os pontos fracos.
 
 Retorne rigorosamente no formato de dados estruturado padrão fornecido.`;
+}
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content: systemInstruction,
-          },
-          {
-            role: 'user',
-            content: promptString,
-          },
-        ],
-      }),
-    });
+async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<RespostaAnaliseIA> {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY não configurada.');
+  }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Groq respondeu com erro ${response.status}: ${errorText}`);
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: buildPrompt(perfil, simulados) },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Groq respondeu com erro ${response.status}: ${errorText}`);
+  }
+
+  const responseData = await response.json() as {
+    choices?: Array<{
+      message?: {
+        content?: string | null;
+      };
+    }>;
+  };
+
+  const responseText = responseData.choices?.[0]?.message?.content;
+  if (!responseText) {
+    throw new Error('A resposta gerada pela IA está vazia.');
+  }
+
+  return JSON.parse(extractJsonPayload(responseText)) as RespostaAnaliseIA;
+}
+
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Método não permitido.' });
+    return;
+  }
+
+  try {
+    const { perfil, simulados } = req.body || {};
+
+    if (!simulados || !Array.isArray(simulados) || simulados.length === 0) {
+      res.status(400).json({ error: 'Nenhum simulado fornecido para análise.' });
+      return;
     }
 
-    const responseData = await response.json() as {
-      choices?: Array<{
-        message?: {
-          content?: string | null;
-        };
-      }>;
-    };
-
-    const responseText = responseData.choices?.[0]?.message?.content;
-    if (!responseText) {
-      throw new Error('A resposta gerada pela IA está vazia.');
-    }
-
-    const dataParsed = JSON.parse(extractJsonPayload(responseText));
-    return res.json(dataParsed);
+    const dataParsed = await runAnalysis(perfil, simulados);
+    res.status(200).json(dataParsed);
   } catch (error: any) {
     console.error('Error during AI analysis:', error);
     res.status(500).json({
@@ -140,31 +132,4 @@ Retorne rigorosamente no formato de dados estruturado padrão fornecido.`;
       details: error?.message || String(error),
     });
   }
-});
-
-// Setup Vite & Static Assets serving
-async function bootstrap() {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('Starting server in Development Mode...');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    console.log('Starting server in Production Mode...');
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Application environment running on host 0.0.0.0 pointing to port ${PORT}`);
-  });
 }
-
-bootstrap().catch((err) => {
-  console.error('Failed to bootstrap the Express/Vite server:', err);
-});

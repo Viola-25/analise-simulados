@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Simulado, PerfilAluno } from './types';
+import { Session } from '@supabase/supabase-js';
+import { Simulado, PerfilAluno, UserAppDataRecord } from './types';
 import { calcularMetricasGlobais, MetricasGlobais } from './utils/stats';
 import Dashboard from './components/Dashboard';
 import SimuladosList from './components/SimuladosList';
@@ -13,6 +14,8 @@ import PerfilForm from './components/PerfilForm';
 import CadernoErros from './components/CadernoErros';
 import AiInsights from './components/AiInsights';
 import PrintReport from './components/PrintReport';
+import AuthGate from './components/AuthGate';
+import { createClient as createSupabaseClient } from './utils/supabase/client';
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -29,6 +32,95 @@ import {
   FileDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+const supabase = createSupabaseClient();
+const SUPABASE_TABLE = 'user_app_data';
+const LOCAL_STORAGE_KEYS = {
+  perfil: 'med_simulados_perfil',
+  simulados: 'med_simulados_data',
+};
+
+function getStorageKeys(userId?: string) {
+  if (!userId) {
+    return LOCAL_STORAGE_KEYS;
+  }
+
+  return {
+    perfil: `${LOCAL_STORAGE_KEYS.perfil}_${userId}`,
+    simulados: `${LOCAL_STORAGE_KEYS.simulados}_${userId}`,
+  };
+}
+
+function normalizePerfil(value: unknown): PerfilAluno | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as Partial<PerfilAluno>;
+  return {
+    nome: candidate.nome || PERFIL_PADRAO.nome,
+    especialidadeAlvo: candidate.especialidadeAlvo || PERFIL_PADRAO.especialidadeAlvo,
+    instituicaoAlvo: candidate.instituicaoAlvo || PERFIL_PADRAO.instituicaoAlvo,
+    metaAcertosPercentual: typeof candidate.metaAcertosPercentual === 'number' ? candidate.metaAcertosPercentual : PERFIL_PADRAO.metaAcertosPercentual,
+  };
+}
+
+function normalizeSimulados(value: unknown): Simulado[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  return value.filter((item): item is Simulado => Boolean(item && typeof item === 'object' && 'id' in item && 'nome' in item));
+}
+
+function readCachedData(userId?: string) {
+  if (typeof window === 'undefined') {
+    return { perfil: PERFIL_PADRAO, simulados: SIMULADOS_PADRAO };
+  }
+
+  const keys = getStorageKeys(userId);
+  const fallbackPerfilRaw = localStorage.getItem(LOCAL_STORAGE_KEYS.perfil);
+  const fallbackSimuladosRaw = localStorage.getItem(LOCAL_STORAGE_KEYS.simulados);
+  const perfilRaw = localStorage.getItem(keys.perfil) ?? fallbackPerfilRaw;
+  const simuladosRaw = localStorage.getItem(keys.simulados) ?? fallbackSimuladosRaw;
+
+  let perfil = PERFIL_PADRAO;
+  let simulados = SIMULADOS_PADRAO;
+
+  try {
+    if (perfilRaw) {
+      const parsedPerfil = normalizePerfil(JSON.parse(perfilRaw));
+      if (parsedPerfil) {
+        perfil = parsedPerfil;
+      }
+    }
+  } catch {
+    perfil = PERFIL_PADRAO;
+  }
+
+  try {
+    if (simuladosRaw) {
+      const parsedSimulados = normalizeSimulados(JSON.parse(simuladosRaw));
+      if (parsedSimulados) {
+        simulados = parsedSimulados;
+      }
+    }
+  } catch {
+    simulados = SIMULADOS_PADRAO;
+  }
+
+  return { perfil, simulados };
+}
+
+function writeCachedData(userId: string | undefined, perfil: PerfilAluno, simulados: Simulado[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const keys = getStorageKeys(userId);
+  localStorage.setItem(keys.perfil, JSON.stringify(perfil));
+  localStorage.setItem(keys.simulados, JSON.stringify(simulados));
+}
 
 // Dados iniciais padrões para o estudante de medicina ja iniciar com conteúdo visual
 const PERFIL_PADRAO: PerfilAluno = {
@@ -112,48 +204,158 @@ const SIMULADOS_PADRAO: Simulado[] = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'simulados' | 'erros' | 'ai' | 'perfil'>('dashboard');
+  const [session, setSession] = useState<Session | null>(null);
   const [perfil, setPerfil] = useState<PerfilAluno>(PERFIL_PADRAO);
   const [simulados, setSimulados] = useState<Simulado[]>(SIMULADOS_PADRAO);
   const [showForm, setShowForm] = useState(false);
   const [simuladoEditando, setSimuladoEditando] = useState<Simulado | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  // 1. Carregar dados do localStorage ao montar
   useEffect(() => {
-    const savedPerfil = localStorage.getItem('med_simulados_perfil');
-    const savedSimulados = localStorage.getItem('med_simulados_data');
-    
-    if (savedPerfil) {
-      try {
-        setPerfil(JSON.parse(savedPerfil));
-      } catch (e) {
-        console.error('Falha ao restaurar perfil', e);
+    let cancelled = false;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) {
+        return;
       }
-    }
-    if (savedSimulados) {
-      try {
-        setSimulados(JSON.parse(savedSimulados));
-      } catch (e) {
-        console.error('Falha ao restaurar simulados', e);
-      }
-    }
+
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+      data.subscription.unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setPerfil(PERFIL_PADRAO);
+      setSimulados(SIMULADOS_PADRAO);
+      setDataLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadUserData = async () => {
+      setDataLoading(true);
+      setAuthError(null);
+
+      try {
+        const { data, error } = await supabase
+          .from(SUPABASE_TABLE)
+          .select('perfil, simulados')
+          .eq('user_id', session.user.id)
+          .maybeSingle<UserAppDataRecord>();
+
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+
+        const cached = readCachedData(session.user.id);
+
+        if (data) {
+          const loadedPerfil = normalizePerfil(data.perfil) ?? cached.perfil;
+          const loadedSimulados = normalizeSimulados(data.simulados) ?? cached.simulados;
+
+          if (!cancelled) {
+            setPerfil(loadedPerfil);
+            setSimulados(loadedSimulados);
+          }
+          writeCachedData(session.user.id, loadedPerfil, loadedSimulados);
+          return;
+        }
+
+        if (!cancelled) {
+          setPerfil(cached.perfil);
+          setSimulados(cached.simulados);
+        }
+
+        const { error: upsertError } = await supabase.from(SUPABASE_TABLE).upsert({
+          user_id: session.user.id,
+          perfil: cached.perfil,
+          simulados: cached.simulados,
+          updated_at: new Date().toISOString(),
+        });
+
+        if (upsertError) {
+          throw upsertError;
+        }
+      } catch (error: any) {
+        console.error('Falha ao carregar dados do Supabase', error);
+        if (!cancelled) {
+          setAuthError('Não foi possível carregar os dados do seu perfil no Supabase.');
+          const cached = readCachedData(session.user.id);
+          setPerfil(cached.perfil);
+          setSimulados(cached.simulados);
+        }
+      } finally {
+        if (!cancelled) {
+          setDataLoading(false);
+        }
+      }
+    };
+
+    void loadUserData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // 2. Persistir no localStorage
+  const persistUserData = async (nextPerfil: PerfilAluno, nextSimulados: Simulado[]) => {
+    writeCachedData(session?.user.id, nextPerfil, nextSimulados);
+
+    if (!session) {
+      return;
+    }
+
+    const { error } = await supabase.from(SUPABASE_TABLE).upsert({
+      user_id: session.user.id,
+      perfil: nextPerfil,
+      simulados: nextSimulados,
+      updated_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      throw error;
+    }
+  };
+
   const savePerfilToCache = (newPerfil: PerfilAluno) => {
     setPerfil(newPerfil);
-    localStorage.setItem('med_simulados_perfil', JSON.stringify(newPerfil));
     triggerToast('Configurações de perfil atualizadas!');
+    void persistUserData(newPerfil, simulados)
+      .catch((error) => {
+        console.error('Falha ao salvar perfil', error);
+        setAuthError('Perfil salvo localmente, mas houve falha na sincronização com o Supabase.');
+        triggerToast('Perfil salvo localmente. Falha na sincronização com Supabase.');
+      });
   };
 
   const saveSimuladosToCache = (newSimulados: Simulado[]) => {
     setSimulados(newSimulados);
-    localStorage.setItem('med_simulados_data', JSON.stringify(newSimulados));
+    void persistUserData(perfil, newSimulados)
+      .catch((error) => {
+        console.error('Falha ao salvar simulados', error);
+        setAuthError('Simulados salvos localmente, mas houve falha na sincronização com o Supabase.');
+        triggerToast('Simulados salvos localmente. Falha na sincronização com Supabase.');
+      });
   };
 
   // 3. Cadastrar ou Editar Simulado
@@ -221,13 +423,19 @@ export default function App() {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed.perfil && parsed.simulados) {
-          setPerfil(parsed.perfil);
-          setSimulados(parsed.simulados);
-          
-          localStorage.setItem('med_simulados_perfil', JSON.stringify(parsed.perfil));
-          localStorage.setItem('med_simulados_data', JSON.stringify(parsed.simulados));
-          
-          triggerToast('Importação concluída com sucesso!');
+          const importedPerfil = normalizePerfil(parsed.perfil) ?? PERFIL_PADRAO;
+          const importedSimulados = normalizeSimulados(parsed.simulados) ?? SIMULADOS_PADRAO;
+
+          setPerfil(importedPerfil);
+          setSimulados(importedSimulados);
+
+          void persistUserData(importedPerfil, importedSimulados)
+            .then(() => triggerToast('Importação concluída e sincronizada com sucesso!'))
+            .catch((error) => {
+              console.error('Falha ao sincronizar importação', error);
+              setAuthError('Importação salva localmente, mas falhou a sincronização com o Supabase.');
+              triggerToast('Importação concluída localmente, mas sem sincronização com Supabase.');
+            });
         } else {
           alert('Arquivo inválido. Formato incompatível de prontuário.');
         }
@@ -245,7 +453,60 @@ export default function App() {
     window.print();
   };
 
+  const handleSignIn = async (email: string, password: string) => {
+    setAuthError(null);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
+  };
+
+  const handleSignUp = async (email: string, password: string) => {
+    setAuthError(null);
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
+    triggerToast('Conta criada. Se o Supabase exigir confirmação por e-mail, verifique sua caixa de entrada.');
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setPerfil(PERFIL_PADRAO);
+    setSimulados(SIMULADOS_PADRAO);
+    setShowForm(false);
+    setSimuladoEditando(null);
+    triggerToast('Sessão encerrada com sucesso.');
+  };
+
   const metricas: MetricasGlobais = calcularMetricasGlobais(simulados);
+
+  if (authLoading || (session && dataLoading)) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] text-slate-100 flex items-center justify-center px-4">
+        <div className="glass-panel-heavy max-w-md w-full p-8 rounded-3xl border border-white/10 text-center space-y-4 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center mx-auto">
+            <Brain size={28} className="animate-pulse" />
+          </div>
+          <h1 className="text-xl font-bold text-white">Sincronizando sua sessão</h1>
+          <p className="text-sm text-slate-400">Carregando autenticação e dados do Supabase...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <AuthGate
+        busy={false}
+        error={authError}
+        onSignIn={handleSignIn}
+        onSignUp={handleSignUp}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col relative overflow-x-hidden print:bg-white print:text-black" id="med-simulados-app">
@@ -287,6 +548,16 @@ export default function App() {
                 {perfil.metaAcertosPercentual}% vs <span className="text-blue-400 font-extrabold">{metricas.porcentagemAcertosGeral.toFixed(1)}%</span>
               </span>
             </div>
+            <div className="text-xs">
+              <span className="text-slate-400 font-medium block">Sessão</span>
+              <span className="font-bold text-blue-300 block max-w-44 truncate">{session.user.email}</span>
+            </div>
+            <button
+              onClick={() => void handleSignOut()}
+              className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-semibold transition-all"
+            >
+              Sair
+            </button>
           </div>
         </div>
       </header>
@@ -326,7 +597,7 @@ export default function App() {
               id="tab-ai"
             >
               <Brain size={14} />
-              Foco com IA (Gemini)
+              Foco com IA (Groq)
             </button>
             <button
               onClick={() => { setActiveTab('perfil'); setShowForm(false); }}
@@ -507,7 +778,7 @@ export default function App() {
       <footer className="bg-white/2 border-t border-white/8 py-5 print:hidden text-center text-[10px] text-slate-500 shrink-0 uppercase tracking-widest font-semibold z-10" id="app-footer">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <span>MD-SIMULADOS • Prontuário e Ficha de Triagem R1</span>
-          <span>DADOS CRIPTOGRAFADOS E SALVOS LOCALMENTE</span>
+          <span>{session ? 'DADOS SINCRONIZADOS COM SUPABASE' : 'DADOS CRIPTOGRAFADOS E SALVOS LOCALMENTE'}</span>
         </div>
       </footer>
     </div>
