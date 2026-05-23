@@ -15,7 +15,7 @@ import CadernoErros from './components/CadernoErros';
 import AiInsights from './components/AiInsights';
 import PrintReport from './components/PrintReport';
 import AuthGate from './components/AuthGate';
-import { createClient as createSupabaseClient } from './utils/supabase/client';
+import { createClient as createSupabaseClient, isSupabaseConfigured } from './utils/supabase/client';
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -502,6 +502,7 @@ export default function App() {
       <AuthGate
         busy={false}
         error={authError}
+        configError={isSupabaseConfigured ? null : 'As variáveis do Supabase não foram embutidas no build. Na Vercel, use VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY em Production e faça novo deploy.'}
         onSignIn={handleSignIn}
         onSignUp={handleSignUp}
       />

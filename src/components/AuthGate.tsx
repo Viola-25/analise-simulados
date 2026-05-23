@@ -10,11 +10,12 @@ import { motion } from 'motion/react';
 interface AuthGateProps {
   busy: boolean;
   error: string | null;
+  configError?: string | null;
   onSignIn: (email: string, password: string) => Promise<void>;
   onSignUp: (email: string, password: string) => Promise<void>;
 }
 
-export default function AuthGate({ busy, error, onSignIn, onSignUp }: AuthGateProps) {
+export default function AuthGate({ busy, error, configError, onSignIn, onSignUp }: AuthGateProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [localBusy, setLocalBusy] = useState<'signin' | 'signup' | null>(null);
@@ -115,6 +116,12 @@ export default function AuthGate({ busy, error, onSignIn, onSignUp }: AuthGatePr
               />
             </label>
           </div>
+
+          {configError && (
+            <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-950/20 px-4 py-3 text-xs text-amber-200 leading-relaxed">
+              {configError}
+            </div>
+          )}
 
           {error && (
             <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-950/20 px-4 py-3 text-xs text-rose-300 leading-relaxed">
