@@ -73,7 +73,11 @@ export default async function handler(req: any, res: any) {
     }
 
     if (error) {
-      throw error;
+      const errorMessage = typeof error?.message === 'string' ? error.message : 'falha ao carregar os dados de comparação';
+      warning = warning
+        ? `${warning} Também houve uma falha ao consultar a base (${errorMessage}).`
+        : `Falha ao consultar a base (${errorMessage}). Exibindo comparação limitada.`;
+      data = [];
     }
 
     const records: ComparisonRecord[] = (data || []).map((item: any) => ({

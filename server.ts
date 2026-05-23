@@ -257,7 +257,11 @@ app.post('/api/compare-performance', async (req, res) => {
     }
 
     if (error) {
-      throw error;
+      const errorMessage = typeof error?.message === 'string' ? error.message : 'falha ao carregar os dados de comparação';
+      warning = warning
+        ? `${warning} Também houve uma falha ao consultar a base (${errorMessage}).`
+        : `Falha ao consultar a base (${errorMessage}). Exibindo comparação limitada.`;
+      data = [];
     }
 
     const records: ComparisonRecord[] = (data || []).map((item: any) => ({
