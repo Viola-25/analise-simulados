@@ -1109,7 +1109,7 @@ export default function App() {
       {/* FOOTER CLINICO */}
       <footer className="bg-white/2 border-t border-white/8 py-5 print:hidden text-center text-[10px] text-slate-500 shrink-0 uppercase tracking-widest font-semibold z-10" id="app-footer">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <span>MD-SIMULADOS • Prontuário e Ficha de Triagem R1</span>
+          <span>Feito por Enzo Viola • MED SC XXVIII</span>
           <span>{session ? 'DADOS SINCRONIZADOS COM SUPABASE' : 'DADOS CRIPTOGRAFADOS E SALVOS LOCALMENTE'}</span>
         </div>
       </footer>
