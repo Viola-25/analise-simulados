@@ -212,11 +212,11 @@ app.post('/api/compare-performance', async (req, res) => {
       return res.status(401).json({ error: 'Sessão não autenticada.' });
     }
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       return res.status(500).json({ error: 'Configuração do Supabase incompleta para comparação anônima.' });
     }
 
@@ -233,10 +233,28 @@ app.post('/api/compare-performance', async (req, res) => {
       return res.status(401).json({ error: 'Não foi possível validar a sessão do usuário.' });
     }
 
-    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
-    const { data, error } = await adminClient
-      .from('user_app_data')
-      .select('user_id, perfil, simulados');
+    let data: any[] | null = null;
+    let error: any = null;
+    let warning: string | undefined;
+
+    if (supabaseServiceRoleKey) {
+      const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+      const queryResult = await adminClient
+        .from('user_app_data')
+        .select('user_id, perfil, simulados');
+
+      data = queryResult.data;
+      error = queryResult.error;
+    } else {
+      const queryResult = await authClient
+        .from('user_app_data')
+        .select('user_id, perfil, simulados')
+        .eq('user_id', userData.user.id);
+
+      data = queryResult.data;
+      error = queryResult.error;
+      warning = 'Comparação completa indisponível neste ambiente; exibindo apenas seus próprios dados. Configure SUPABASE_SERVICE_ROLE_KEY no servidor para habilitar o comparativo agregado.';
+    }
 
     if (error) {
       throw error;
@@ -249,6 +267,11 @@ app.post('/api/compare-performance', async (req, res) => {
     }));
 
     const payload = buildAnonymousComparisonResponse(records, userData.user.id, (req.body?.filters || {}));
+
+    if (warning) {
+      payload.warning = payload.warning ? `${payload.warning} ${warning}` : warning;
+    }
+
     return res.status(200).json(payload);
   } catch (error: any) {
     console.error('Error during anonymous comparison:', error);
