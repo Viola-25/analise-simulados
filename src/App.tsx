@@ -1089,7 +1089,7 @@ export default function App() {
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <Sparkles size={14} className="text-blue-400" />
-            Dica: exporte o prontuário antes de trocar de dispositivo.
+            Dica: seus dados sincronizam automaticamente com a mesma conta; exporte só como backup extra.
           </div>
           <button
             onClick={() => {
