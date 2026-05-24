@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Loader2, Mail, Lock, User, Activity, GraduationCap, Target, ShieldCheck, ArrowLeft, UserPlus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { PerfilAluno } from '../types';
+import SearchableFaculdadeSelect from './SearchableFaculdadeSelect';
 import { BR_STATES } from '../utils/brStates';
 
 interface SignupGateProps {
@@ -172,7 +173,14 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
                 <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
                   Faculdade
                 </span>
-                <input type="text" value={faculdade} onChange={(e) => setFaculdade(e.target.value)} placeholder="Ex: Universidade Federal de ..." className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-emerald-500 transition-all placeholder:text-slate-500" required />
+                  <div>
+                    <SearchableFaculdadeSelect
+                      id="signup-faculdade-input"
+                      value={faculdade}
+                      onSelect={(v) => setFaculdade(v)}
+                      placeholder="Ex: Universidade Federal de ..."
+                    />
+                  </div>
               </label>
 
               <label className="block space-y-2">

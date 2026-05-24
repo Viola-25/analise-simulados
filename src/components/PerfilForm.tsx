@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { PerfilAluno } from '../types';
+import SearchableFaculdadeSelect from './SearchableFaculdadeSelect';
 import { User, Activity, GraduationCap, Target, Save, CheckCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { BR_STATES } from '../utils/brStates';
@@ -112,15 +113,14 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
               <GraduationCap size={14} className="text-slate-400" />
               Faculdade
             </label>
-            <input
-              id="faculdade-input"
-              type="text"
-              value={faculdade}
-              onChange={(e) => setFaculdade(e.target.value)}
-              placeholder="Ex: Universidade Federal de..."
-              className="w-full px-4 py-2.5 rounded-xl border border-white/10 focus:border-blue-500 focus:bg-white/8 outline-none text-white bg-white/3 transition-all text-sm placeholder-slate-500 font-sans"
-              required
-            />
+            <div>
+              <SearchableFaculdadeSelect
+                id="faculdade-input"
+                value={faculdade}
+                onSelect={(v) => setFaculdade(v)}
+                placeholder="Ex: Universidade Federal de..."
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

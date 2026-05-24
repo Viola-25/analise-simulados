@@ -7,8 +7,8 @@ import { AnonymousComparisonAreaBenchmark, AnonymousComparisonDistributionBucket
 
 export interface ComparisonRecord {
   user_id: string;
-  perfil: PerfilAluno;
-  simulados: Simulado[];
+  perfil: PerfilAluno | null | undefined;
+  simulados: Simulado[] | null | undefined;
 }
 
 interface UserStats {
@@ -30,6 +30,10 @@ const FAIXAS = [
 
 function normalizeText(value?: string | null) {
   return (value ?? '').trim().toLowerCase();
+}
+
+function normalizePerfil(perfil?: PerfilAluno | null) {
+  return (perfil && typeof perfil === 'object' ? perfil : {}) as PerfilAluno;
 }
 
 function round(value: number) {
@@ -77,7 +81,7 @@ function collectDistinctValues(records: ComparisonRecord[], selector: (perfil: P
   const seen = new Map<string, string>();
 
   records.forEach((record) => {
-    const rawValue = selector(record.perfil);
+    const rawValue = selector(normalizePerfil(record.perfil));
     if (typeof rawValue !== 'string') {
       return;
     }
@@ -109,6 +113,7 @@ function getUserStats(record: ComparisonRecord): UserStats {
     'Medicina Preventiva': { acertos: 0, total: 0 },
   };
 
+  const perfil = normalizePerfil(record.perfil);
   const simulados = Array.isArray(record.simulados) ? record.simulados : [];
 
   const scores = simulados
@@ -135,7 +140,7 @@ function getUserStats(record: ComparisonRecord): UserStats {
 
   return {
     user_id: record.user_id,
-    perfil: record.perfil,
+    perfil,
     mediaGeral: mean(scores),
     simuladosConsiderados: scores.length,
     areaAverages: {
@@ -192,7 +197,7 @@ export function buildAnonymousComparisonResponse(records: ComparisonRecord[], cu
   const currentUserStats = allUserStats.find((item) => item.user_id === currentUserId);
 
   const cohortRecords = records.filter((record) => {
-    const perfil = record.perfil || ({} as PerfilAluno);
+    const perfil = normalizePerfil(record.perfil);
     const estado = normalizeText(perfil.estado);
     const faculdade = normalizeText(perfil.faculdade);
     const semestre = normalizeText(perfil.semestre);
