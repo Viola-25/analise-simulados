@@ -254,7 +254,7 @@ export default function ComparacaoAnonima({ perfil, accessToken }: ComparacaoAno
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <label className="space-y-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
             Estado
             <select
@@ -297,40 +297,54 @@ export default function ComparacaoAnonima({ perfil, accessToken }: ComparacaoAno
             </select>
           </label>
 
-          <label className="space-y-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Faz cursinho
-            <select
-              value={filters.fazCursinho}
-              onChange={(e) => {
-                const value = e.target.value as '' | 'sim' | 'nao';
-                setFilters((current) => ({
-                  ...current,
-                  fazCursinho: value,
-                  cursinho: value === 'sim' ? current.cursinho : '',
-                }));
-              }}
-              className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-blue-500 transition-all text-sm"
-            >
-              <option value="" className="bg-[#0f172a]">Todos</option>
-              <option value="sim" className="bg-[#0f172a]">Sim</option>
-              <option value="nao" className="bg-[#0f172a]">Não</option>
-            </select>
-          </label>
+          <div className="space-y-2 md:col-span-2 xl:col-span-1">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block">Recorte de cursinho</span>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setFilters((current) => ({ ...current, fazCursinho: '', cursinho: '' }))}
+                className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${filters.fazCursinho === '' ? 'bg-blue-600 border-blue-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilters((current) => ({ ...current, fazCursinho: 'sim' }))}
+                className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${filters.fazCursinho === 'sim' ? 'bg-emerald-600 border-emerald-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+              >
+                Com cursinho
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilters((current) => ({ ...current, fazCursinho: 'nao', cursinho: '' }))}
+                className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${filters.fazCursinho === 'nao' ? 'bg-indigo-600 border-indigo-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+              >
+                Sem cursinho
+              </button>
+            </div>
+          </div>
+        </div>
 
-          <label className="space-y-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Cursinho
-            <select
-              value={filters.cursinho}
-              onChange={(e) => setFilters((current) => ({ ...current, cursinho: e.target.value }))}
-              disabled={filters.fazCursinho === 'nao'}
-              className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-blue-500 transition-all text-sm disabled:opacity-50"
-            >
-              <option value="" className="bg-[#0f172a]">Todos</option>
-              {availableFilters.cursinhos.map((cursinho) => (
-                <option key={cursinho} value={cursinho} className="bg-[#0f172a]">{cursinho}</option>
-              ))}
-            </select>
-          </label>
+        {filters.fazCursinho === 'sim' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="space-y-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Qual cursinho
+              <select
+                value={filters.cursinho}
+                onChange={(e) => setFilters((current) => ({ ...current, cursinho: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-blue-500 transition-all text-sm"
+              >
+                <option value="" className="bg-[#0f172a]">Todos os cursinhos</option>
+                {availableFilters.cursinhos.map((cursinho) => (
+                  <option key={cursinho} value={cursinho} className="bg-[#0f172a]">{cursinho}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+
+        <div className="text-[11px] text-slate-400 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+          Fluxo simples: escolha o recorte (Todos, Com cursinho ou Sem cursinho). Se escolher "Com cursinho", você pode opcionalmente refinar por um cursinho específico.
         </div>
 
         <div className="rounded-xl border border-cyan-500/20 bg-cyan-950/15 p-3 flex items-center justify-between gap-3 flex-wrap">
@@ -354,9 +368,9 @@ export default function ComparacaoAnonima({ perfil, accessToken }: ComparacaoAno
             {' · '}
             <span className="text-slate-200 font-semibold">{currentFiltersPayload.semestre || 'todos os semestres'}</span>
             {' · '}
-            <span className="text-slate-200 font-semibold">{currentFiltersPayload.fazCursinho === 'sim' ? 'faz cursinho' : currentFiltersPayload.fazCursinho === 'nao' ? 'não faz cursinho' : 'com ou sem cursinho'}</span>
+            <span className="text-slate-200 font-semibold">{currentFiltersPayload.fazCursinho === 'sim' ? 'com cursinho' : currentFiltersPayload.fazCursinho === 'nao' ? 'sem cursinho' : 'com e sem cursinho'}</span>
             {' · '}
-            <span className="text-slate-200 font-semibold">{currentFiltersPayload.cursinho || 'todos os cursinhos'}</span>
+            <span className="text-slate-200 font-semibold">{currentFiltersPayload.fazCursinho === 'sim' ? (currentFiltersPayload.cursinho || 'todos os cursinhos') : 'cursinho específico não aplicado'}</span>
           </div>
           <button
             onClick={() => void loadComparison(filters)}
