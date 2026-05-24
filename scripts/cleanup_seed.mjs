@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('Por favor defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no ambiente.');
+  console.error('Por favor defina SUPABASE_SERVICE_ROLE_KEY no ambiente. A URL pode vir de SUPABASE_URL ou VITE_SUPABASE_URL.');
   process.exit(1);
 }
 
@@ -64,11 +64,7 @@ async function cleanup() {
       console.log('Deletado usuário Auth', uid);
     }
   }
-  if (error) {
-    console.error('Erro ao deletar registros seed:', error);
-    process.exit(1);
-  }
-  console.log('Remoção concluída. Registros afetados:', Array.isArray(data) ? data.length : 0);
+  console.log('Remoção de registros seed e usuários Auth concluída.');
 }
 
 cleanup().catch((err) => { console.error(err); process.exit(1); });
