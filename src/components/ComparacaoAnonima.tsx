@@ -103,18 +103,18 @@ export default function ComparacaoAnonima({ perfil, accessToken }: ComparacaoAno
       estado: perfil.estado && perfil.estado !== 'Não informado' ? perfil.estado : '',
       faculdade: perfil.faculdade && perfil.faculdade !== 'Não informada' ? perfil.faculdade : '',
       semestre: perfil.semestre && perfil.semestre !== 'Não informado' ? perfil.semestre : '',
-      fazCursinho: perfil.fazCursinhoResidencia ? 'sim' : '',
-      cursinho: perfil.fazCursinhoResidencia ? perfil.cursinhoResidencia : '',
+      fazCursinho: '',
+      cursinho: '',
       usarCorrecaoCursinho: true,
     });
-  }, [perfil.estado, perfil.faculdade, perfil.semestre, perfil.fazCursinhoResidencia, perfil.cursinhoResidencia]);
+  }, [perfil.estado, perfil.faculdade, perfil.semestre]);
 
   const currentFiltersPayload = useMemo(() => ({
     estado: filters.estado || null,
     faculdade: filters.faculdade || null,
     semestre: filters.semestre || null,
     fazCursinho: filters.fazCursinho || null,
-    cursinho: filters.cursinho || null,
+    cursinho: filters.fazCursinho === 'sim' ? (filters.cursinho || null) : null,
     usarCorrecaoCursinho: filters.usarCorrecaoCursinho,
   }), [filters]);
 
@@ -180,7 +180,7 @@ export default function ComparacaoAnonima({ perfil, accessToken }: ComparacaoAno
             faculdade: nextFilters.faculdade || null,
             semestre: nextFilters.semestre || null,
             fazCursinho: nextFilters.fazCursinho || null,
-            cursinho: nextFilters.cursinho || null,
+            cursinho: nextFilters.fazCursinho === 'sim' ? (nextFilters.cursinho || null) : null,
             usarCorrecaoCursinho: nextFilters.usarCorrecaoCursinho,
           },
         }),
@@ -301,7 +301,14 @@ export default function ComparacaoAnonima({ perfil, accessToken }: ComparacaoAno
             Faz cursinho
             <select
               value={filters.fazCursinho}
-              onChange={(e) => setFilters((current) => ({ ...current, fazCursinho: e.target.value as '' | 'sim' | 'nao' }))}
+              onChange={(e) => {
+                const value = e.target.value as '' | 'sim' | 'nao';
+                setFilters((current) => ({
+                  ...current,
+                  fazCursinho: value,
+                  cursinho: value === 'sim' ? current.cursinho : '',
+                }));
+              }}
               className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-blue-500 transition-all text-sm"
             >
               <option value="" className="bg-[#0f172a]">Todos</option>
