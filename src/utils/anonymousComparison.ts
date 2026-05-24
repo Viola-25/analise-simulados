@@ -28,6 +28,10 @@ const FAIXAS = [
   { label: '90-100%', min: 90, max: 100 },
 ];
 
+const CURSINHO_CORRECAO_ALPHA = 0.65;
+const CURSINHO_CORRECAO_AMOSTRA_MINIMA = 5;
+const CURSINHO_CORRECAO_CAP = 8;
+
 function normalizeText(value?: string | null) {
   return (value ?? '').trim().toLowerCase();
 }
@@ -38,6 +42,36 @@ function normalizePerfil(perfil?: PerfilAluno | null) {
 
 function round(value: number) {
   return Math.round(value * 10) / 10;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function parseFazCursinho(value: unknown): 'sim' | 'nao' | null {
+  if (value === 'sim' || value === true) {
+    return 'sim';
+  }
+
+  if (value === 'nao' || value === false) {
+    return 'nao';
+  }
+
+  return null;
+}
+
+function hasValidCursinho(perfil: PerfilAluno) {
+  const nome = (perfil.cursinhoResidencia || '').trim();
+  const key = normalizeText(nome);
+  return Boolean(nome) && key !== 'não faço cursinho' && key !== 'nao faço cursinho' && key !== 'não informado' && key !== 'nao informado';
+}
+
+function getPerfilCursinho(perfil: PerfilAluno) {
+  if (!perfil.fazCursinhoResidencia || !hasValidCursinho(perfil)) {
+    return null;
+  }
+
+  return (perfil.cursinhoResidencia || '').trim();
 }
 
 function mean(values: number[]) {
@@ -185,15 +219,66 @@ export function buildAnonymousComparisonResponse(records: ComparisonRecord[], cu
     estado: filters.estado?.trim() || null,
     faculdade: filters.faculdade?.trim() || null,
     semestre: filters.semestre?.trim() || null,
+    fazCursinho: parseFazCursinho(filters.fazCursinho),
+    cursinho: filters.cursinho?.trim() || null,
+    usarCorrecaoCursinho: filters.usarCorrecaoCursinho !== false,
   };
 
   const availableFilters = {
     estados: collectDistinctValues(records, (perfil) => perfil.estado),
     faculdades: collectDistinctValues(records, (perfil) => perfil.faculdade),
     semestres: collectDistinctValues(records, (perfil) => perfil.semestre),
+    cursinhos: collectDistinctValues(records, (perfil) => getPerfilCursinho(perfil) || ''),
+    situacoesCursinho: ['sim', 'nao'] as Array<'sim' | 'nao'>,
   };
 
   const allUserStats = records.map(getUserStats);
+  const allUsersWithStats = allUserStats.filter((item) => item.simuladosConsiderados > 0);
+
+  const globalAverage = mean(allUsersWithStats.map((item) => item.mediaGeral));
+  const cursinhoBuckets = new Map<string, { count: number; sum: number }>();
+
+  allUsersWithStats.forEach((item) => {
+    const cursinho = getPerfilCursinho(item.perfil);
+    if (!cursinho) {
+      return;
+    }
+
+    const key = normalizeText(cursinho);
+    const current = cursinhoBuckets.get(key) || { count: 0, sum: 0 };
+    current.count += 1;
+    current.sum += item.mediaGeral;
+    cursinhoBuckets.set(key, current);
+  });
+
+  let usuariosAjustados = 0;
+  const comparableScoreByUser = new Map<string, number>();
+
+  allUsersWithStats.forEach((item) => {
+    let adjusted = item.mediaGeral;
+    if (normalizedFilters.usarCorrecaoCursinho) {
+      const cursinho = getPerfilCursinho(item.perfil);
+      if (cursinho) {
+        const key = normalizeText(cursinho);
+        const bucket = cursinhoBuckets.get(key);
+        if (bucket && bucket.count >= CURSINHO_CORRECAO_AMOSTRA_MINIMA) {
+          const cursinhoMean = bucket.sum / bucket.count;
+          const correction = clamp((globalAverage - cursinhoMean) * CURSINHO_CORRECAO_ALPHA, -CURSINHO_CORRECAO_CAP, CURSINHO_CORRECAO_CAP);
+          adjusted = item.mediaGeral + correction;
+          if (Math.abs(correction) >= 0.1) {
+            usuariosAjustados += 1;
+          }
+        }
+      }
+    }
+
+    comparableScoreByUser.set(item.user_id, adjusted);
+  });
+
+  function getComparableScore(item: UserStats) {
+    return comparableScoreByUser.get(item.user_id) ?? item.mediaGeral;
+  }
+
   const currentUserStats = allUserStats.find((item) => item.user_id === currentUserId);
 
   const cohortRecords = records.filter((record) => {
@@ -201,18 +286,23 @@ export function buildAnonymousComparisonResponse(records: ComparisonRecord[], cu
     const estado = normalizeText(perfil.estado);
     const faculdade = normalizeText(perfil.faculdade);
     const semestre = normalizeText(perfil.semestre);
+    const fazCursinho = parseFazCursinho(perfil.fazCursinhoResidencia);
+    const cursinho = normalizeText(getPerfilCursinho(perfil));
 
     const estadoMatches = !normalizedFilters.estado || estado === normalizeText(normalizedFilters.estado);
     const faculdadeMatches = !normalizedFilters.faculdade || faculdade === normalizeText(normalizedFilters.faculdade);
     const semestreMatches = !normalizedFilters.semestre || semestre === normalizeText(normalizedFilters.semestre);
+    const fazCursinhoMatches = !normalizedFilters.fazCursinho || fazCursinho === normalizedFilters.fazCursinho;
+    const cursinhoMatches = !normalizedFilters.cursinho || cursinho === normalizeText(normalizedFilters.cursinho);
 
-    return estadoMatches && faculdadeMatches && semestreMatches;
+    return estadoMatches && faculdadeMatches && semestreMatches && fazCursinhoMatches && cursinhoMatches;
   });
 
   const cohortStats = cohortRecords.map(getUserStats).filter((item) => item.simuladosConsiderados > 0);
-  const cohortAverages = cohortStats.map((item) => item.mediaGeral);
+  const cohortAverages = cohortStats.map((item) => getComparableScore(item));
 
   const usuarioMedia = currentUserStats?.mediaGeral ?? 0;
+  const usuarioMediaComparavel = currentUserStats ? getComparableScore(currentUserStats) : 0;
   const usuarioAreaAverages = currentUserStats?.areaAverages ?? {
     'Clínica Médica': 0,
     'Cirurgia Geral': 0,
@@ -222,9 +312,9 @@ export function buildAnonymousComparisonResponse(records: ComparisonRecord[], cu
   };
 
   const isIncluded = cohortRecords.some((record) => record.user_id === currentUserId);
-  const percentile = percentileRank(cohortAverages, usuarioMedia);
+  const percentile = percentileRank(cohortAverages, usuarioMediaComparavel);
   const position = cohortAverages.length > 0
-    ? cohortAverages.filter((value) => value > usuarioMedia).length + 1
+    ? cohortAverages.filter((value) => value > usuarioMediaComparavel).length + 1
     : 0;
 
   return {
@@ -246,10 +336,11 @@ export function buildAnonymousComparisonResponse(records: ComparisonRecord[], cu
     },
     usuario: {
       mediaGeral: round(usuarioMedia),
+      mediaComparavel: round(usuarioMediaComparavel),
       posicao: position > 0 ? position : 0,
       totalUsuarios: cohortStats.length,
       percentil: round(percentile),
-      deltaParaMedia: round(usuarioMedia - mean(cohortAverages)),
+      deltaParaMedia: round(usuarioMediaComparavel - mean(cohortAverages)),
       simuladosConsiderados: currentUserStats?.simuladosConsiderados ?? 0,
       areaBenchmarks: buildAreaBenchmarks(
         usuarioAreaAverages,
@@ -257,6 +348,12 @@ export function buildAnonymousComparisonResponse(records: ComparisonRecord[], cu
       ),
     },
     currentUserIncluded: isIncluded,
+    correcaoCursinho: {
+      habilitada: normalizedFilters.usarCorrecaoCursinho,
+      alpha: CURSINHO_CORRECAO_ALPHA,
+      amostraMinima: CURSINHO_CORRECAO_AMOSTRA_MINIMA,
+      usuariosAjustados,
+    },
     warning: !isIncluded && cohortStats.length > 0
       ? 'Seu perfil atual não entra no recorte filtrado; a comparação mostra a base selecionada, mas não considera você dentro dela.'
       : cohortStats.length === 0

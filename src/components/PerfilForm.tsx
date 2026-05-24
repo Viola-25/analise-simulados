@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { PerfilAluno } from '../types';
 import SearchableFaculdadeSelect from './SearchableFaculdadeSelect';
+import SearchableCursinhoSelect from './SearchableCursinhoSelect';
 import { User, Activity, GraduationCap, Target, Save, CheckCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { BR_STATES } from '../utils/brStates';
@@ -20,6 +21,8 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
   const [estado, setEstado] = useState(perfil.estado);
   const [faculdade, setFaculdade] = useState(perfil.faculdade);
   const [semestre, setSemestre] = useState(perfil.semestre);
+  const [fazCursinhoResidencia, setFazCursinhoResidencia] = useState(perfil.fazCursinhoResidencia);
+  const [cursinhoResidencia, setCursinhoResidencia] = useState(perfil.cursinhoResidencia);
   const [especialidadeAlvo, setEspecialidadeAlvo] = useState(perfil.especialidadeAlvo);
   const [instituicaoAlvo, setInstituicaoAlvo] = useState(perfil.instituicaoAlvo);
   const [metaAcertosPercentual, setMetaAcertosPercentual] = useState(perfil.metaAcertosPercentual);
@@ -30,6 +33,8 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
     setEstado(perfil.estado);
     setFaculdade(perfil.faculdade);
     setSemestre(perfil.semestre);
+    setFazCursinhoResidencia(perfil.fazCursinhoResidencia);
+    setCursinhoResidencia(perfil.cursinhoResidencia);
     setEspecialidadeAlvo(perfil.especialidadeAlvo);
     setInstituicaoAlvo(perfil.instituicaoAlvo);
     setMetaAcertosPercentual(perfil.metaAcertosPercentual);
@@ -42,6 +47,8 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
       estado: estado.trim() || 'Não informado',
       faculdade: faculdade.trim() || 'Não informada',
       semestre: semestre.trim() || 'Não informado',
+      fazCursinhoResidencia,
+      cursinhoResidencia: fazCursinhoResidencia ? (cursinhoResidencia.trim() || 'Não informado') : 'Não faço cursinho',
       especialidadeAlvo: especialidadeAlvo.trim() || 'Residência Médica',
       instituicaoAlvo: instituicaoAlvo.trim() || 'Instituição Alvo',
       metaAcertosPercentual: Number(metaAcertosPercentual) || 80,
@@ -140,6 +147,47 @@ export default function PerfilForm({ perfil, onSave }: PerfilFormProps) {
               required
             />
           </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <GraduationCap size={14} className="text-slate-400" />
+              Você faz cursinho para residência?
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFazCursinhoResidencia(true)}
+                className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${fazCursinhoResidencia ? 'bg-emerald-600 border-emerald-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+              >
+                Sim
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFazCursinhoResidencia(false);
+                  setCursinhoResidencia('');
+                }}
+                className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${!fazCursinhoResidencia ? 'bg-blue-600 border-blue-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+              >
+                Não
+              </button>
+            </div>
+          </div>
+
+          {fazCursinhoResidencia && (
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5" htmlFor="cursinho-input">
+                <GraduationCap size={14} className="text-slate-400" />
+                Cursinho de residência
+              </label>
+              <SearchableCursinhoSelect
+                id="cursinho-input"
+                value={cursinhoResidencia}
+                onSelect={(value) => setCursinhoResidencia(value)}
+                placeholder="Ex: Medgrupo"
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5" htmlFor="especialidade-input">

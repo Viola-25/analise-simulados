@@ -26,7 +26,10 @@ export function computeSimuladoStats(
   desvioPadrao?: number,
   posicaoRanking?: number,
   totalParticipantes?: number,
-  cadernoErros?: string
+  cadernoErros?: string,
+  ehSimuladoCursinho?: boolean,
+  origemSimuladoCursinho?: 'proprio' | 'outro' | null,
+  cursinhoOrigemNome?: string,
 ): Omit<Simulado, 'id'> {
   let acertosTotais = 0;
   let questoesTotais = 0;
@@ -80,6 +83,9 @@ export function computeSimuladoStats(
     posicaoRanking: posicaoRanking !== undefined ? Number(posicaoRanking) : undefined,
     totalParticipantes: totalParticipantes !== undefined ? Number(totalParticipantes) : undefined,
     cadernoErros: cadernoErros || '',
+    ehSimuladoCursinho: Boolean(ehSimuladoCursinho),
+    origemSimuladoCursinho: ehSimuladoCursinho ? (origemSimuladoCursinho || null) : null,
+    cursinhoOrigemNome: ehSimuladoCursinho ? cursinhoOrigemNome?.trim() || undefined : undefined,
     acertosTotais,
     questoesTotais,
     percentualAcertos,

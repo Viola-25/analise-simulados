@@ -24,6 +24,11 @@ export interface Simulado {
   data: string; // YYYY-MM-DD
   tempoResolucaoMinutos: number; // tempo total em minutos
   desempenhoAreas: Record<GrandeArea, DesempenhoArea>;
+
+  // Origem do simulado
+  ehSimuladoCursinho?: boolean;
+  origemSimuladoCursinho?: 'proprio' | 'outro' | null;
+  cursinhoOrigemNome?: string;
   
   // Dados opcionais de concorrência/ranking
   mediaParticipantes?: number; // média de acertos dos participantes
@@ -47,6 +52,8 @@ export interface PerfilAluno {
   estado: string;
   faculdade: string;
   semestre: string;
+  fazCursinhoResidencia: boolean;
+  cursinhoResidencia: string;
   especialidadeAlvo: string;
   instituicaoAlvo: string;
   metaAcertosPercentual: number; // e.g. 80 para 80%
@@ -56,6 +63,9 @@ export interface AnonymousComparisonFilters {
   estado?: string | null;
   faculdade?: string | null;
   semestre?: string | null;
+  fazCursinho?: 'sim' | 'nao' | null;
+  cursinho?: string | null;
+  usarCorrecaoCursinho?: boolean | null;
 }
 
 export interface AnonymousComparisonAreaBenchmark {
@@ -76,6 +86,8 @@ export interface AnonymousComparisonResponse {
     estados: string[];
     faculdades: string[];
     semestres: string[];
+    cursinhos: string[];
+    situacoesCursinho: Array<'sim' | 'nao'>;
   };
   appliedFilters: Required<AnonymousComparisonFilters>;
   cohort: {
@@ -91,6 +103,7 @@ export interface AnonymousComparisonResponse {
   };
   usuario: {
     mediaGeral: number;
+    mediaComparavel?: number;
     posicao: number;
     totalUsuarios: number;
     percentil: number;
@@ -100,6 +113,12 @@ export interface AnonymousComparisonResponse {
   };
   currentUserIncluded: boolean;
   warning?: string;
+  correcaoCursinho?: {
+    habilitada: boolean;
+    alpha: number;
+    amostraMinima: number;
+    usuariosAjustados: number;
+  };
 }
 
 export interface RespostaAnaliseIA {

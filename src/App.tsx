@@ -100,11 +100,21 @@ function normalizePerfil(value: unknown): PerfilAluno | null {
   }
 
   const candidate = value as Partial<PerfilAluno>;
+  const fazCursinhoResidencia = typeof candidate.fazCursinhoResidencia === 'boolean'
+    ? candidate.fazCursinhoResidencia
+    : Boolean(candidate.cursinhoResidencia && candidate.cursinhoResidencia.trim() && candidate.cursinhoResidencia !== 'Não faço cursinho');
+
+  const cursinhoResidencia = fazCursinhoResidencia
+    ? (candidate.cursinhoResidencia?.trim() || 'Não informado')
+    : 'Não faço cursinho';
+
   return {
     nome: candidate.nome || PERFIL_PADRAO.nome,
     estado: candidate.estado || PERFIL_PADRAO.estado,
     faculdade: candidate.faculdade || PERFIL_PADRAO.faculdade,
     semestre: candidate.semestre || PERFIL_PADRAO.semestre,
+    fazCursinhoResidencia,
+    cursinhoResidencia,
     especialidadeAlvo: candidate.especialidadeAlvo || PERFIL_PADRAO.especialidadeAlvo,
     instituicaoAlvo: candidate.instituicaoAlvo || PERFIL_PADRAO.instituicaoAlvo,
     metaAcertosPercentual: typeof candidate.metaAcertosPercentual === 'number' ? candidate.metaAcertosPercentual : PERFIL_PADRAO.metaAcertosPercentual,
@@ -278,6 +288,8 @@ const PERFIL_PADRAO: PerfilAluno = {
   estado: 'Não informado',
   faculdade: 'Não informada',
   semestre: 'Não informado',
+  fazCursinhoResidencia: false,
+  cursinhoResidencia: 'Não faço cursinho',
   especialidadeAlvo: 'Cirurgia Geral',
   instituicaoAlvo: 'ENARE / USP-SP',
   metaAcertosPercentual: 80,
@@ -1016,6 +1028,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 print:hidden z-10" id="main-content-flow">
         {showForm ? (
           <SimuladoForm
+            perfil={perfil}
             simuladoEditando={simuladoEditando}
             onSave={handleSaveSimulado}
             onCancel={() => { setShowForm(false); setSimuladoEditando(null); }}

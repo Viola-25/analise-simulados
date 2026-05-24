@@ -8,6 +8,7 @@ import { Loader2, Mail, Lock, User, Activity, GraduationCap, Target, ShieldCheck
 import { motion } from 'motion/react';
 import { PerfilAluno } from '../types';
 import SearchableFaculdadeSelect from './SearchableFaculdadeSelect';
+import SearchableCursinhoSelect from './SearchableCursinhoSelect';
 import { BR_STATES } from '../utils/brStates';
 
 interface SignupGateProps {
@@ -27,6 +28,8 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
   const [estado, setEstado] = useState('');
   const [faculdade, setFaculdade] = useState('');
   const [semestre, setSemestre] = useState('');
+  const [fazCursinhoResidencia, setFazCursinhoResidencia] = useState(false);
+  const [cursinhoResidencia, setCursinhoResidencia] = useState('');
   const [especialidadeAlvo, setEspecialidadeAlvo] = useState('');
   const [instituicaoAlvo, setInstituicaoAlvo] = useState('');
   const [metaAcertosPercentual, setMetaAcertosPercentual] = useState(80);
@@ -41,6 +44,11 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
 
     if (!email.trim() || !password.trim() || !nome.trim() || !estado.trim() || !faculdade.trim() || !semestre.trim() || !especialidadeAlvo.trim() || !instituicaoAlvo.trim()) {
       setLocalError('Preencha e-mail, senha, estado, faculdade, semestre e os dados iniciais do perfil para continuar.');
+      return;
+    }
+
+    if (fazCursinhoResidencia && !cursinhoResidencia.trim()) {
+      setLocalError('Selecione o nome do cursinho para continuar.');
       return;
     }
 
@@ -59,6 +67,8 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
           estado: estado.trim(),
           faculdade: faculdade.trim(),
           semestre: semestre.trim(),
+            fazCursinhoResidencia,
+            cursinhoResidencia: fazCursinhoResidencia ? cursinhoResidencia.trim() : 'Não faço cursinho',
           especialidadeAlvo: especialidadeAlvo.trim(),
           instituicaoAlvo: instituicaoAlvo.trim(),
           metaAcertosPercentual: Number(metaAcertosPercentual) || 80,
@@ -189,6 +199,45 @@ export default function SignupGate({ busy, error, configError, notice, onBackToL
                 </span>
                 <input type="number" min="1" max="12" value={semestre} onChange={(e) => setSemestre(e.target.value)} placeholder="Ex: 8" className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white outline-none focus:border-emerald-500 transition-all placeholder:text-slate-500" required />
               </label>
+
+              <div className="block space-y-2 md:col-span-2">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                  Você faz cursinho para residência?
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFazCursinhoResidencia(true)}
+                    className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${fazCursinhoResidencia ? 'bg-emerald-600 border-emerald-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+                  >
+                    Sim
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFazCursinhoResidencia(false);
+                      setCursinhoResidencia('');
+                    }}
+                    className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${!fazCursinhoResidencia ? 'bg-blue-600 border-blue-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+                  >
+                    Não
+                  </button>
+                </div>
+              </div>
+
+              {fazCursinhoResidencia && (
+                <label className="block space-y-2 md:col-span-2">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                    Qual cursinho você faz?
+                  </span>
+                  <SearchableCursinhoSelect
+                    id="signup-cursinho-input"
+                    value={cursinhoResidencia}
+                    onSelect={(value) => setCursinhoResidencia(value)}
+                    placeholder="Ex: Medgrupo"
+                  />
+                </label>
+              )}
 
               <label className="block space-y-2">
                 <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">

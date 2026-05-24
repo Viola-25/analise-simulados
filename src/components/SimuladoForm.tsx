@@ -4,21 +4,27 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Simulado, GrandeArea, GRANDES_AREAS } from '../types';
+import { Simulado, GrandeArea, GRANDES_AREAS, PerfilAluno } from '../types';
 import { computeSimuladoStats } from '../utils/stats';
 import { Calendar, Tag, Clock, Award, Users, BookOpen, Save, X, PlusCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import SearchableCursinhoSelect from './SearchableCursinhoSelect';
 
 interface SimuladoFormProps {
+  perfil: PerfilAluno;
   simuladoEditando?: Simulado | null;
   onSave: (simulado: Simulado) => void;
   onCancel: () => void;
 }
 
-export default function SimuladoForm({ simuladoEditando, onSave, onCancel }: SimuladoFormProps) {
+export default function SimuladoForm({ perfil, simuladoEditando, onSave, onCancel }: SimuladoFormProps) {
   const [nome, setNome] = useState('');
   const [data, setData] = useState('');
   const [tempoResolucaoMinutos, setTempoResolucaoMinutos] = useState<number>(240); // padrão de 4 horas
+  const [ehSimuladoCursinho, setEhSimuladoCursinho] = useState(false);
+  const [tipoOrigemCursinho, setTipoOrigemCursinho] = useState<'proprio' | 'outro'>('proprio');
+  const [cursinhoOutroNome, setCursinhoOutroNome] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
   
   // Áreas da medicina iniciadas vazias ou com padrão de 20 questões cada
   const [desempenhoAreas, setDesempenhoAreas] = useState<Record<GrandeArea, { acertos: number; total: number }>>({
@@ -50,10 +56,17 @@ export default function SimuladoForm({ simuladoEditando, onSave, onCancel }: Sim
       setPosicaoRanking(simuladoEditando.posicaoRanking?.toString() || '');
       setTotalParticipantes(simuladoEditando.totalParticipantes?.toString() || '');
       setCadernoErros(simuladoEditando.cadernoErros || '');
+      const origem = simuladoEditando.origemSimuladoCursinho || 'outro';
+      setEhSimuladoCursinho(Boolean(simuladoEditando.ehSimuladoCursinho));
+      setTipoOrigemCursinho(origem === 'proprio' ? 'proprio' : 'outro');
+      setCursinhoOutroNome(origem === 'outro' ? (simuladoEditando.cursinhoOrigemNome || '') : '');
     } else {
       // Data padrão hoje
       const hoje = new Date().toISOString().split('T')[0];
       setData(hoje);
+      setEhSimuladoCursinho(false);
+      setTipoOrigemCursinho('proprio');
+      setCursinhoOutroNome('');
     }
   }, [simuladoEditando]);
 
@@ -80,11 +93,29 @@ export default function SimuladoForm({ simuladoEditando, onSave, onCancel }: Sim
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
 
     const media = mediaParticipantes ? Number(mediaParticipantes) : undefined;
     const desvio = desvioPadrao ? Number(desvioPadrao) : undefined;
     const ranking = posicaoRanking ? Number(posicaoRanking) : undefined;
     const totalPart = totalParticipantes ? Number(totalParticipantes) : undefined;
+
+    let origemSimuladoCursinho: 'proprio' | 'outro' | null = null;
+    let cursinhoOrigemNome: string | undefined;
+
+    if (ehSimuladoCursinho) {
+      if (tipoOrigemCursinho === 'proprio' && perfil.fazCursinhoResidencia && perfil.cursinhoResidencia !== 'Não faço cursinho') {
+        origemSimuladoCursinho = 'proprio';
+        cursinhoOrigemNome = perfil.cursinhoResidencia;
+      } else {
+        origemSimuladoCursinho = 'outro';
+        if (!cursinhoOutroNome.trim()) {
+          setFormError('Informe o nome do cursinho de origem deste simulado.');
+          return;
+        }
+        cursinhoOrigemNome = cursinhoOutroNome.trim();
+      }
+    }
 
     const stats = computeSimuladoStats(
       nome.trim(),
@@ -95,7 +126,10 @@ export default function SimuladoForm({ simuladoEditando, onSave, onCancel }: Sim
       desvio,
       ranking,
       totalPart,
-      cadernoErros.trim()
+      cadernoErros.trim(),
+      ehSimuladoCursinho,
+      origemSimuladoCursinho,
+      cursinhoOrigemNome,
     );
 
     const simuladoParaSalvar: Simulado = {
@@ -191,6 +225,67 @@ export default function SimuladoForm({ simuladoEditando, onSave, onCancel }: Sim
               className="w-full px-3 py-2 rounded-lg border border-white/10 focus:border-blue-500 focus:bg-white/8 outline-none text-sm text-white bg-white/3 placeholder-slate-500 font-sans transition-all"
             />
           </div>
+        </div>
+
+        <div className="space-y-3 bg-white/3 p-4 rounded-xl border border-white/10">
+          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2">
+            Origem do Simulado
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setEhSimuladoCursinho(true)}
+              className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${ehSimuladoCursinho ? 'bg-emerald-600 border-emerald-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+            >
+              Foi simulado de cursinho
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEhSimuladoCursinho(false);
+                setCursinhoOutroNome('');
+              }}
+              className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${!ehSimuladoCursinho ? 'bg-blue-600 border-blue-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+            >
+              Não foi de cursinho
+            </button>
+          </div>
+
+          {ehSimuladoCursinho && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTipoOrigemCursinho('proprio')}
+                  disabled={!perfil.fazCursinhoResidencia || perfil.cursinhoResidencia === 'Não faço cursinho'}
+                  className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${tipoOrigemCursinho === 'proprio' ? 'bg-emerald-600 border-emerald-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+                >
+                  Do meu cursinho ({perfil.fazCursinhoResidencia ? perfil.cursinhoResidencia : 'não informado'})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipoOrigemCursinho('outro')}
+                  className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${tipoOrigemCursinho === 'outro' ? 'bg-blue-600 border-blue-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+                >
+                  De outro cursinho
+                </button>
+              </div>
+
+              {(tipoOrigemCursinho === 'outro' || !perfil.fazCursinhoResidencia || perfil.cursinhoResidencia === 'Não faço cursinho') && (
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                    Nome do cursinho de origem
+                  </label>
+                  <SearchableCursinhoSelect
+                    id="simulado-cursinho-origem"
+                    value={cursinhoOutroNome}
+                    onSelect={(value) => setCursinhoOutroNome(value)}
+                    placeholder="Ex: Medcel"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* PARTE B: Desempenho por Grande Área */}
@@ -365,6 +460,12 @@ export default function SimuladoForm({ simuladoEditando, onSave, onCancel }: Sim
             className="w-full px-4 py-3 rounded-lg border border-white/10 focus:border-blue-500 focus:bg-white/8 outline-none text-sm text-slate-100 bg-[#0f172a]"
           />
         </div>
+
+        {formError && (
+          <div className="rounded-xl border border-rose-500/20 bg-rose-950/20 px-4 py-3 text-xs text-rose-300 leading-relaxed">
+            {formError}
+          </div>
+        )}
 
         {/* Botões do Rodapé */}
         <div className="flex justify-end gap-3 border-t border-white/10 pt-5">

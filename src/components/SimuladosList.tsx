@@ -134,6 +134,12 @@ export default function SimuladosList({ simulados, onRequestDelete, onEdit, onAd
                         <span>{sim.tempoResolucaoMinutos} min</span>
                         <span className="text-slate-600">•</span>
                         <span>{sim.acertosTotais}/{sim.questoesTotais} q.</span>
+                        {sim.ehSimuladoCursinho && (
+                          <>
+                            <span className="text-slate-600">•</span>
+                            <span className="text-emerald-300">{sim.origemSimuladoCursinho === 'proprio' ? 'Seu cursinho' : sim.cursinhoOrigemNome || 'Outro cursinho'}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -187,6 +193,12 @@ export default function SimuladosList({ simulados, onRequestDelete, onEdit, onAd
                       {/* Grid de estatísticas por grande área no simulado */}
                       <div className="space-y-2">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Gabarito por Grande Área</span>
+
+                        {sim.ehSimuladoCursinho && (
+                          <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-200">
+                            Origem do simulado: <span className="font-semibold">{sim.origemSimuladoCursinho === 'proprio' ? 'Seu cursinho atual' : sim.cursinhoOrigemNome || 'Outro cursinho'}</span>
+                          </div>
+                        )}
                         
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           {GRANDES_AREAS.map((area) => {
