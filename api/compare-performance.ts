@@ -4,18 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-
-type AnonymousComparisonFilters = {
-  estado?: string | null;
-  faculdade?: string | null;
-  semestre?: string | null;
-};
-
-type ComparisonRecord = {
-  user_id: string;
-  perfil: any;
-  simulados: any[];
-};
+import { buildAnonymousComparisonResponse, ComparisonRecord, AnonymousComparisonFilters } from './_anonymousComparison';
 
 type DebugStage = 'method' | 'auth' | 'config' | 'session' | 'query' | 'sanitize' | 'build' | 'response' | 'error';
 
@@ -291,7 +280,6 @@ export default async function handler(req: any, res: any) {
 
     try {
       debugContext.stage = 'build';
-      const { buildAnonymousComparisonResponse } = await import('../src/utils/anonymousComparison');
       payload = buildAnonymousComparisonResponse(records, userData.user.id, filters);
     } catch (buildError: any) {
       debugContext.buildError = getErrorMessage(buildError, 'falha interna ao montar o comparativo');
