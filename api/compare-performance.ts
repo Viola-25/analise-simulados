@@ -4,8 +4,18 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { buildAnonymousComparisonResponse, ComparisonRecord } from '../src/utils/anonymousComparison';
-import { AnonymousComparisonFilters } from '../src/types';
+
+type AnonymousComparisonFilters = {
+  estado?: string | null;
+  faculdade?: string | null;
+  semestre?: string | null;
+};
+
+type ComparisonRecord = {
+  user_id: string;
+  perfil: any;
+  simulados: any[];
+};
 
 type DebugStage = 'method' | 'auth' | 'config' | 'session' | 'query' | 'sanitize' | 'build' | 'response' | 'error';
 
@@ -89,6 +99,65 @@ function toComparisonRecords(rows: any[] | null | undefined): { records: Compari
   stats.validRows = records.length;
 
   return { records, stats };
+}
+
+function buildFallbackComparisonPayload(filters: AnonymousComparisonFilters) {
+  const normalizedFilters = {
+    estado: filters.estado?.trim() || null,
+    faculdade: filters.faculdade?.trim() || null,
+    semestre: filters.semestre?.trim() || null,
+  };
+
+  const emptyAreas = [
+    'Clínica Médica',
+    'Cirurgia Geral',
+    'Pediatria',
+    'Ginecologia e Obstetrícia',
+    'Medicina Preventiva',
+  ].map((area) => ({
+    area,
+    mediaUsuario: 0,
+    mediaGrupo: 0,
+    delta: 0,
+  }));
+
+  return {
+    availableFilters: {
+      estados: [],
+      faculdades: [],
+      semestres: [],
+    },
+    appliedFilters: normalizedFilters,
+    cohort: {
+      totalUsuarios: 0,
+      totalSimulados: 0,
+      mediaGeral: 0,
+      medianaGeral: 0,
+      desvioPadrao: 0,
+      melhorGeral: 0,
+      piorGeral: 0,
+      distribution: [
+        { faixa: '0-49%', quantidade: 0, percentual: 0 },
+        { faixa: '50-59%', quantidade: 0, percentual: 0 },
+        { faixa: '60-69%', quantidade: 0, percentual: 0 },
+        { faixa: '70-79%', quantidade: 0, percentual: 0 },
+        { faixa: '80-89%', quantidade: 0, percentual: 0 },
+        { faixa: '90-100%', quantidade: 0, percentual: 0 },
+      ],
+      areaBenchmarks: emptyAreas,
+    },
+    usuario: {
+      mediaGeral: 0,
+      posicao: 0,
+      totalUsuarios: 0,
+      percentil: 0,
+      deltaParaMedia: 0,
+      simuladosConsiderados: 0,
+      areaBenchmarks: emptyAreas,
+    },
+    currentUserIncluded: false,
+    warning: 'Comparação temporariamente indisponível para este recorte.',
+  };
 }
 
 function buildDebugPayload(context: CompareDebugContext) {
@@ -218,14 +287,15 @@ export default async function handler(req: any, res: any) {
     const { records, stats } = toComparisonRecords(data);
     debugContext.sanitization = stats;
 
-    let payload;
+    let payload: any;
 
     try {
       debugContext.stage = 'build';
+      const { buildAnonymousComparisonResponse } = await import('../src/utils/anonymousComparison');
       payload = buildAnonymousComparisonResponse(records, userData.user.id, filters);
     } catch (buildError: any) {
       debugContext.buildError = getErrorMessage(buildError, 'falha interna ao montar o comparativo');
-      payload = buildAnonymousComparisonResponse([], userData.user.id, filters);
+      payload = buildFallbackComparisonPayload(filters);
       const fallbackWarning = `Alguns dados da base foram ignorados por estarem em formato inválido (${debugContext.buildError}).`;
       payload.warning = payload.warning ? `${payload.warning} ${fallbackWarning}` : fallbackWarning;
     }
