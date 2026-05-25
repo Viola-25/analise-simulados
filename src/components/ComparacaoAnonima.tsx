@@ -78,6 +78,73 @@ function variabilitySummary(stdDevValue: number) {
   return 'Grupo muito heterogêneo: interprete posição com cautela.';
 }
 
+function normalizeComparisonResponse(input: unknown): AnonymousComparisonResponse | null {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const source = input as Partial<AnonymousComparisonResponse> & {
+    availableFilters?: unknown;
+    cohort?: unknown;
+    usuario?: unknown;
+    warning?: unknown;
+  };
+
+  const availableFiltersSource = (source.availableFilters && typeof source.availableFilters === 'object') ? source.availableFilters as Partial<AnonymousComparisonResponse['availableFilters']> : {};
+  const cohortSource = (source.cohort && typeof source.cohort === 'object') ? source.cohort as Partial<AnonymousComparisonResponse['cohort']> : {};
+  const usuarioSource = (source.usuario && typeof source.usuario === 'object') ? source.usuario as Partial<AnonymousComparisonResponse['usuario']> : {};
+
+  return {
+    availableFilters: {
+      estados: Array.isArray(availableFiltersSource.estados) ? availableFiltersSource.estados.filter((item): item is string => typeof item === 'string') : [],
+      faculdades: Array.isArray(availableFiltersSource.faculdades) ? availableFiltersSource.faculdades.filter((item): item is string => typeof item === 'string') : [],
+      semestres: Array.isArray(availableFiltersSource.semestres) ? availableFiltersSource.semestres.filter((item): item is string => typeof item === 'string') : [],
+      cursinhos: Array.isArray(availableFiltersSource.cursinhos) ? availableFiltersSource.cursinhos.filter((item): item is string => typeof item === 'string') : [],
+      situacoesCursinho: ['sim', 'nao'],
+    },
+    appliedFilters: {
+      estado: typeof source.appliedFilters?.estado === 'string' ? source.appliedFilters.estado : null,
+      faculdade: typeof source.appliedFilters?.faculdade === 'string' ? source.appliedFilters.faculdade : null,
+      semestre: typeof source.appliedFilters?.semestre === 'string' ? source.appliedFilters.semestre : null,
+      fazCursinho: source.appliedFilters?.fazCursinho === 'sim' || source.appliedFilters?.fazCursinho === 'nao' ? source.appliedFilters.fazCursinho : null,
+      cursinho: typeof source.appliedFilters?.cursinho === 'string' ? source.appliedFilters.cursinho : null,
+      usarCorrecaoCursinho: typeof source.appliedFilters?.usarCorrecaoCursinho === 'boolean' ? source.appliedFilters.usarCorrecaoCursinho : true,
+    },
+    cohort: {
+      totalUsuarios: typeof cohortSource.totalUsuarios === 'number' && Number.isFinite(cohortSource.totalUsuarios) ? cohortSource.totalUsuarios : 0,
+      totalSimulados: typeof cohortSource.totalSimulados === 'number' && Number.isFinite(cohortSource.totalSimulados) ? cohortSource.totalSimulados : 0,
+      mediaGeral: typeof cohortSource.mediaGeral === 'number' && Number.isFinite(cohortSource.mediaGeral) ? cohortSource.mediaGeral : 0,
+      medianaGeral: typeof cohortSource.medianaGeral === 'number' && Number.isFinite(cohortSource.medianaGeral) ? cohortSource.medianaGeral : 0,
+      desvioPadrao: typeof cohortSource.desvioPadrao === 'number' && Number.isFinite(cohortSource.desvioPadrao) ? cohortSource.desvioPadrao : 0,
+      melhorGeral: typeof cohortSource.melhorGeral === 'number' && Number.isFinite(cohortSource.melhorGeral) ? cohortSource.melhorGeral : 0,
+      piorGeral: typeof cohortSource.piorGeral === 'number' && Number.isFinite(cohortSource.piorGeral) ? cohortSource.piorGeral : 0,
+      distribution: Array.isArray(cohortSource.distribution)
+        ? cohortSource.distribution.filter((bucket): bucket is AnonymousComparisonResponse['cohort']['distribution'][number] => Boolean(bucket && typeof bucket === 'object' && typeof bucket.faixa === 'string'))
+        : [],
+      areaBenchmarks: Array.isArray(cohortSource.areaBenchmarks)
+        ? cohortSource.areaBenchmarks.filter((item): item is AnonymousComparisonResponse['cohort']['areaBenchmarks'][number] => Boolean(item && typeof item === 'object' && typeof item.area === 'string'))
+        : [],
+    },
+    usuario: {
+      mediaGeral: typeof usuarioSource.mediaGeral === 'number' && Number.isFinite(usuarioSource.mediaGeral) ? usuarioSource.mediaGeral : 0,
+      mediaComparavel: typeof usuarioSource.mediaComparavel === 'number' && Number.isFinite(usuarioSource.mediaComparavel) ? usuarioSource.mediaComparavel : undefined,
+      posicao: typeof usuarioSource.posicao === 'number' && Number.isFinite(usuarioSource.posicao) ? usuarioSource.posicao : 0,
+      totalUsuarios: typeof usuarioSource.totalUsuarios === 'number' && Number.isFinite(usuarioSource.totalUsuarios) ? usuarioSource.totalUsuarios : 0,
+      percentil: typeof usuarioSource.percentil === 'number' && Number.isFinite(usuarioSource.percentil) ? usuarioSource.percentil : 0,
+      deltaParaMedia: typeof usuarioSource.deltaParaMedia === 'number' && Number.isFinite(usuarioSource.deltaParaMedia) ? usuarioSource.deltaParaMedia : 0,
+      simuladosConsiderados: typeof usuarioSource.simuladosConsiderados === 'number' && Number.isFinite(usuarioSource.simuladosConsiderados) ? usuarioSource.simuladosConsiderados : 0,
+      areaBenchmarks: Array.isArray(usuarioSource.areaBenchmarks)
+        ? usuarioSource.areaBenchmarks.filter((item): item is AnonymousComparisonResponse['usuario']['areaBenchmarks'][number] => Boolean(item && typeof item === 'object' && typeof item.area === 'string'))
+        : [],
+    },
+    currentUserIncluded: typeof source.currentUserIncluded === 'boolean' ? source.currentUserIncluded : false,
+    warning: typeof source.warning === 'string' ? source.warning : undefined,
+    correcaoCursinho: typeof source.correcaoCursinho === 'object' && source.correcaoCursinho !== null
+      ? source.correcaoCursinho as AnonymousComparisonResponse['correcaoCursinho']
+      : undefined,
+  };
+}
+
 export default function ComparacaoAnonima({ perfil, accessToken }: ComparacaoAnonimaProps) {
   const [filters, setFilters] = useState<ComparisonFiltersState>({
     estado: '',
@@ -192,8 +259,13 @@ export default function ComparacaoAnonima({ perfil, accessToken }: ComparacaoAno
         throw new Error(data?.error || 'Não foi possível carregar a comparação anônima.');
       }
 
-      setComparison(data);
-      setAvailableFilters(data.availableFilters);
+      const normalized = normalizeComparisonResponse(data);
+      if (!normalized) {
+        throw new Error('A comparação veio em um formato inválido.');
+      }
+
+      setComparison(normalized);
+      setAvailableFilters(normalized.availableFilters);
     } catch (err: any) {
       setError(err?.message || 'Falha ao carregar a comparação anônima.');
     } finally {

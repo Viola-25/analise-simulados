@@ -4,6 +4,7 @@
  */
 
 import { GrandeArea, RespostaAnaliseIA, Simulado } from '../src/types';
+import { normalizeAiAnalysis } from '../src/utils/aiAnalysis';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -112,7 +113,12 @@ async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<Resposta
     throw new Error('A resposta gerada pela IA está vazia.');
   }
 
-  return JSON.parse(extractJsonPayload(responseText)) as RespostaAnaliseIA;
+  const parsed = normalizeAiAnalysis(JSON.parse(extractJsonPayload(responseText)));
+  if (!parsed) {
+    throw new Error('A resposta da IA veio vazia ou em um formato inválido.');
+  }
+
+  return parsed;
 }
 
 export default async function handler(req: any, res: any) {

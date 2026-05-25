@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { createClient } from '@supabase/supabase-js';
 import { buildAnonymousComparisonResponse, ComparisonRecord } from './src/utils/anonymousComparison';
+import { normalizeAiAnalysis } from './src/utils/aiAnalysis';
 
 // Load environment variables
 dotenv.config();
@@ -237,7 +238,11 @@ Retorne rigorosamente no formato de dados estruturado padrão fornecido.`;
       throw new Error('A resposta gerada pela IA está vazia.');
     }
 
-    const dataParsed = JSON.parse(extractJsonPayload(responseText));
+    const dataParsed = normalizeAiAnalysis(JSON.parse(extractJsonPayload(responseText)));
+    if (!dataParsed) {
+      throw new Error('A resposta da IA veio vazia ou em um formato inválido.');
+    }
+
     return res.json(dataParsed);
   } catch (error: any) {
     console.error('Error during AI analysis:', error);

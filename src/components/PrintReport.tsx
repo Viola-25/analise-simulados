@@ -14,11 +14,12 @@ interface PrintReportProps {
 }
 
 export default function PrintReport({ simulados, perfil }: PrintReportProps) {
-  const stats: MetricasGlobais = calcularMetricasGlobais(simulados);
+  const simuladosValidos = simulados.filter((sim): sim is Simulado => Boolean(sim));
+  const stats: MetricasGlobais = calcularMetricasGlobais(simuladosValidos);
   const dataHoje = new Date().toLocaleDateString('pt-BR');
 
   // Ordenar simulados por data para a cronologia
-  const cronologico = [...simulados].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+  const cronologico = [...simuladosValidos].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
 
   return (
     <div className="hidden print:block bg-white text-black p-8 font-sans text-xs w-[21cm] min-h-[29.7cm] mx-auto space-y-8" id="print-academic-report">
@@ -122,6 +123,13 @@ export default function PrintReport({ simulados, perfil }: PrintReportProps) {
                 </tr>
               );
             })}
+            {Object.keys(stats.desempenhoPorArea).length === 0 && (
+              <tr>
+                <td className="p-3 border border-slate-200 text-center text-gray-500" colSpan={5}>
+                  Nenhum simulado válido disponível para consolidar o relatório.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -144,7 +152,7 @@ export default function PrintReport({ simulados, perfil }: PrintReportProps) {
             </tr>
           </thead>
           <tbody>
-            {cronologico.reverse().map((sim) => (
+            {[...cronologico].reverse().map((sim) => (
               <tr key={sim.id} className="hover:bg-slate-50/50">
                 <td className="p-2 border border-slate-200 font-mono text-[10px]">{sim.data.split('-').reverse().join('/')}</td>
                 <td className="p-2 border border-slate-200 font-bold text-slate-800">{sim.nome}</td>
@@ -155,19 +163,26 @@ export default function PrintReport({ simulados, perfil }: PrintReportProps) {
                 <td className="p-2 border border-slate-200 text-right font-mono font-bold">{sim.percentilEstimado !== undefined ? `${sim.percentilEstimado.toFixed(1)}°` : '-'}</td>
               </tr>
             ))}
+            {cronologico.length === 0 && (
+              <tr>
+                <td className="p-3 border border-slate-200 text-center text-gray-500" colSpan={7}>
+                  Nenhum simulado registrado ainda.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
       {/* 6. Caderno de Erros Médico Consolidado */}
-      {simulados.some(s => s.cadernoErros) && (
+      {simuladosValidos.some((s) => Boolean(s.cadernoErros && s.cadernoErros.trim().length > 0)) && (
         <div className="space-y-3" style={{ pageBreakBefore: 'always' }}>
           <h3 className="text-sm font-extrabold uppercase tracking-wide border-b border-slate-200 pb-1 flex items-center gap-1">
             <BookOpen size={14} className="text-slate-800" /> IV. Caderno Clínico de Erros para Revisão Ativa
           </h3>
           <div className="space-y-4">
-            {simulados
-              .filter(s => s.cadernoErros && s.cadernoErros.trim().length > 0)
+            {simuladosValidos
+              .filter((s) => s.cadernoErros && s.cadernoErros.trim().length > 0)
               .map((sim) => (
                 <div key={sim.id} className="border border-slate-200 rounded-lg p-3 space-y-1.5 bg-slate-50/20">
                   <div className="flex justify-between items-center text-[10px] font-bold uppercase text-slate-500">

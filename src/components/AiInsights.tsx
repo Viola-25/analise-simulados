@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Simulado, PerfilAluno, RespostaAnaliseIA, GrandeArea } from '../types';
+import { Simulado, PerfilAluno, RespostaAnaliseIA } from '../types';
+import { normalizeAiAnalysis } from '../utils/aiAnalysis';
 import { Sparkles, Brain, Loader2, AlertCircle, RefreshCw, Calendar, CheckSquare, Target, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -23,7 +24,10 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
     const cached = localStorage.getItem('med_simulados_ai_insights');
     if (cached) {
       try {
-        setAnalise(JSON.parse(cached));
+        const parsed = normalizeAiAnalysis(JSON.parse(cached));
+        if (parsed) {
+          setAnalise(parsed);
+        }
       } catch (e) {
         console.error('Falha ao restaurar insights da IA salvos.', e);
       }
@@ -58,8 +62,14 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
       }
 
       const data: RespostaAnaliseIA = await response.json();
-      setAnalise(data);
-      localStorage.setItem('med_simulados_ai_insights', JSON.stringify(data));
+      const normalized = normalizeAiAnalysis(data);
+
+      if (!normalized) {
+        throw new Error('A resposta da IA veio em um formato inválido.');
+      }
+
+      setAnalise(normalized);
+      localStorage.setItem('med_simulados_ai_insights', JSON.stringify(normalized));
     } catch (err: any) {
       console.error('Error fetching AI analysis:', err);
       setErrorMsg(err?.message || 'Falha na conexão com o servidor de IA. Verifique se o servidor está ativo.');
@@ -181,7 +191,7 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
                 <Target size={16} className="text-blue-400" /> Diagnóstico de Tendência e Gestão Pedagógica
               </h3>
               <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-line font-sans border-l-4 border-blue-500 pl-4 py-1 italic">
-                  {analise.diagnosticoGeral}
+                  {analise.diagnosticoGeral || 'A análise ainda não trouxe um diagnóstico textual.'}
               </div>
             </div>
 
@@ -237,6 +247,11 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
                   );
                 })}
               </div>
+              {analise.analiseAreas.length === 0 && (
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-slate-400">
+                  A IA não retornou a triagem das grandes áreas neste ciclo. Tente executar a análise novamente.
+                </div>
+              )}
             </div>
 
             {/* SEÇÃO 4: Prescrição / Plano de Ação Metodológico */}
@@ -261,6 +276,11 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
                     </div>
                   ))}
                 </div>
+                {analise.planoDeAcao.length === 0 && (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-slate-400">
+                    A IA não retornou um plano de ação estruturado neste ciclo.
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>

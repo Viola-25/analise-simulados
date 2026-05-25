@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { Simulado, PerfilAluno, UserAppDataRecord } from './types';
+import { Simulado, PerfilAluno, UserAppDataRecord, GrandeArea, GRANDES_AREAS, DesempenhoArea } from './types';
 import { calcularMetricasGlobais, MetricasGlobais } from './utils/stats';
 import Dashboard from './components/Dashboard';
 import SimuladosList from './components/SimuladosList';
@@ -121,12 +121,92 @@ function normalizePerfil(value: unknown): PerfilAluno | null {
   };
 }
 
+function buildEmptyDesempenhoAreas(): Record<GrandeArea, DesempenhoArea> {
+  return GRANDES_AREAS.reduce((accumulator, area) => {
+    accumulator[area] = { acertos: 0, total: 0 };
+    return accumulator;
+  }, {} as Record<GrandeArea, DesempenhoArea>);
+}
+
+function normalizeSimulado(value: unknown): Simulado | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as Partial<Simulado> & { desempenhoAreas?: unknown };
+  const id = typeof candidate.id === 'string' && candidate.id.trim().length > 0 ? candidate.id.trim() : null;
+  const nome = typeof candidate.nome === 'string' && candidate.nome.trim().length > 0 ? candidate.nome.trim() : null;
+  const data = typeof candidate.data === 'string' && candidate.data.trim().length > 0 ? candidate.data.trim() : null;
+  const tempoResolucaoMinutos = typeof candidate.tempoResolucaoMinutos === 'number' && Number.isFinite(candidate.tempoResolucaoMinutos)
+    ? candidate.tempoResolucaoMinutos
+    : null;
+  const acertosTotais = typeof candidate.acertosTotais === 'number' && Number.isFinite(candidate.acertosTotais)
+    ? candidate.acertosTotais
+    : null;
+  const questoesTotais = typeof candidate.questoesTotais === 'number' && Number.isFinite(candidate.questoesTotais)
+    ? candidate.questoesTotais
+    : null;
+  const percentualAcertos = typeof candidate.percentualAcertos === 'number' && Number.isFinite(candidate.percentualAcertos)
+    ? candidate.percentualAcertos
+    : null;
+
+  if (!id || !nome || !data || tempoResolucaoMinutos === null || acertosTotais === null || questoesTotais === null || percentualAcertos === null) {
+    return null;
+  }
+
+  const desempenhoAreas = buildEmptyDesempenhoAreas();
+  if (candidate.desempenhoAreas && typeof candidate.desempenhoAreas === 'object') {
+    for (const area of GRANDES_AREAS) {
+      const areaData = (candidate.desempenhoAreas as Record<string, unknown>)[area];
+      if (!areaData || typeof areaData !== 'object') {
+        continue;
+      }
+
+      const acertos = typeof (areaData as Partial<DesempenhoArea>).acertos === 'number' && Number.isFinite((areaData as Partial<DesempenhoArea>).acertos)
+        ? (areaData as Partial<DesempenhoArea>).acertos
+        : 0;
+      const total = typeof (areaData as Partial<DesempenhoArea>).total === 'number' && Number.isFinite((areaData as Partial<DesempenhoArea>).total)
+        ? (areaData as Partial<DesempenhoArea>).total
+        : 0;
+
+      desempenhoAreas[area] = { acertos, total };
+    }
+  }
+
+  return {
+    id,
+    nome,
+    data,
+    tempoResolucaoMinutos,
+    desempenhoAreas,
+    ehSimuladoCursinho: typeof candidate.ehSimuladoCursinho === 'boolean' ? candidate.ehSimuladoCursinho : undefined,
+    origemSimuladoCursinho: candidate.origemSimuladoCursinho === 'proprio' || candidate.origemSimuladoCursinho === 'outro'
+      ? candidate.origemSimuladoCursinho
+      : undefined,
+    cursinhoOrigemNome: typeof candidate.cursinhoOrigemNome === 'string' ? candidate.cursinhoOrigemNome : undefined,
+    mediaParticipantes: typeof candidate.mediaParticipantes === 'number' && Number.isFinite(candidate.mediaParticipantes) ? candidate.mediaParticipantes : undefined,
+    desvioPadrao: typeof candidate.desvioPadrao === 'number' && Number.isFinite(candidate.desvioPadrao) ? candidate.desvioPadrao : undefined,
+    posicaoRanking: typeof candidate.posicaoRanking === 'number' && Number.isFinite(candidate.posicaoRanking) ? candidate.posicaoRanking : undefined,
+    totalParticipantes: typeof candidate.totalParticipantes === 'number' && Number.isFinite(candidate.totalParticipantes) ? candidate.totalParticipantes : undefined,
+    cadernoErros: typeof candidate.cadernoErros === 'string' ? candidate.cadernoErros : undefined,
+    acertosTotais,
+    questoesTotais,
+    percentualAcertos,
+    zScore: typeof candidate.zScore === 'number' && Number.isFinite(candidate.zScore) ? candidate.zScore : undefined,
+    percentilEstimado: typeof candidate.percentilEstimado === 'number' && Number.isFinite(candidate.percentilEstimado) ? candidate.percentilEstimado : undefined,
+  };
+}
+
 function normalizeSimulados(value: unknown): Simulado[] | null {
   if (!Array.isArray(value)) {
     return null;
   }
 
-  return value.filter((item): item is Simulado => Boolean(item && typeof item === 'object' && 'id' in item && 'nome' in item));
+  const normalized = value
+    .map((item) => normalizeSimulado(item))
+    .filter((item): item is Simulado => item !== null);
+
+  return normalized.length > 0 ? normalized : null;
 }
 
 function readCachedData(userId?: string) {
