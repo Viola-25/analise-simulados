@@ -36,6 +36,60 @@ function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
     planoDeAcao?: unknown;
   };
 
+  function normalizeText(value: unknown) {
+    return typeof value === 'string'
+      ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+      : '';
+  }
+
+  function resolveGrandeArea(value: unknown): GrandeArea | null {
+    const normalized = normalizeText(value);
+
+    if (normalized === 'clinica medica' || normalized === 'clinica' || normalized === 'medicina clinica') {
+      return 'Clínica Médica';
+    }
+
+    if (normalized === 'cirurgia geral' || normalized === 'cirurgia') {
+      return 'Cirurgia Geral';
+    }
+
+    if (normalized === 'pediatria' || normalized === 'pediatria geral') {
+      return 'Pediatria';
+    }
+
+    if (normalized === 'ginecologia e obstetricia' || normalized === 'ginecologia obstetricia' || normalized === 'go') {
+      return 'Ginecologia e Obstetrícia';
+    }
+
+    if (normalized === 'medicina preventiva' || normalized === 'preventiva' || normalized === 'saude coletiva') {
+      return 'Medicina Preventiva';
+    }
+
+    return null;
+  }
+
+  function resolvePriority(value: unknown): RespostaAnaliseIA['analiseAreas'][number]['grauPrioridade'] {
+    const normalized = normalizeText(value);
+
+    if (normalized === 'critico') {
+      return 'Crítico';
+    }
+
+    if (normalized === 'atencao') {
+      return 'Atenção';
+    }
+
+    if (normalized === 'adequado') {
+      return 'Adequado';
+    }
+
+    if (normalized === 'excelente') {
+      return 'Excelente';
+    }
+
+    return 'Atenção';
+  }
+
   const analiseAreas = Array.isArray(source.analiseAreas)
     ? source.analiseAreas.flatMap((area) => {
         if (!area || typeof area !== 'object') {
@@ -46,7 +100,8 @@ function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
           temasRecomendados?: unknown;
         };
 
-        if (item.area !== 'Clínica Médica' && item.area !== 'Cirurgia Geral' && item.area !== 'Pediatria' && item.area !== 'Ginecologia e Obstetrícia' && item.area !== 'Medicina Preventiva') {
+        const resolvedArea = resolveGrandeArea(item.area);
+        if (!resolvedArea) {
           return [];
         }
 
@@ -55,11 +110,9 @@ function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
           : [];
 
         return [{
-          area: item.area,
+          area: resolvedArea,
           diagnostico: typeof item.diagnostico === 'string' ? item.diagnostico : '',
-          grauPrioridade: item.grauPrioridade === 'Crítico' || item.grauPrioridade === 'Atenção' || item.grauPrioridade === 'Adequado' || item.grauPrioridade === 'Excelente'
-            ? item.grauPrioridade
-            : 'Atenção',
+          grauPrioridade: resolvePriority(item.grauPrioridade),
           temasRecomendados,
         }];
       })
@@ -70,10 +123,6 @@ function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
     : [];
 
   const diagnosticoGeral = typeof source.diagnosticoGeral === 'string' ? source.diagnosticoGeral.trim() : '';
-
-  if (diagnosticoGeral.length === 0 && analiseAreas.length === 0 && planoDeAcao.length === 0) {
-    return null;
-  }
 
   return {
     diagnosticoGeral,

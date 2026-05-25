@@ -15,6 +15,60 @@ const GRANDES_AREAS_VALIDAS: GrandeArea[] = [
   'Medicina Preventiva',
 ];
 
+function normalizeText(value: unknown) {
+  return typeof value === 'string'
+    ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+    : '';
+}
+
+function resolveGrandeArea(value: unknown): GrandeArea | null {
+  const normalized = normalizeText(value);
+
+  if (normalized === 'clinica medica' || normalized === 'clinica' || normalized === 'medicina clinica') {
+    return 'Clínica Médica';
+  }
+
+  if (normalized === 'cirurgia geral' || normalized === 'cirurgia') {
+    return 'Cirurgia Geral';
+  }
+
+  if (normalized === 'pediatria' || normalized === 'pediatria geral') {
+    return 'Pediatria';
+  }
+
+  if (normalized === 'ginecologia e obstetricia' || normalized === 'ginecologia obstetricia' || normalized === 'go') {
+    return 'Ginecologia e Obstetrícia';
+  }
+
+  if (normalized === 'medicina preventiva' || normalized === 'preventiva' || normalized === 'saude coletiva') {
+    return 'Medicina Preventiva';
+  }
+
+  return null;
+}
+
+function resolvePriority(value: unknown): RespostaAnaliseIA['analiseAreas'][number]['grauPrioridade'] {
+  const normalized = normalizeText(value);
+
+  if (normalized === 'critico') {
+    return 'Crítico';
+  }
+
+  if (normalized === 'atencao') {
+    return 'Atenção';
+  }
+
+  if (normalized === 'adequado') {
+    return 'Adequado';
+  }
+
+  if (normalized === 'excelente') {
+    return 'Excelente';
+  }
+
+  return 'Atenção';
+}
+
 export function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
   if (!input || typeof input !== 'object') {
     return null;
@@ -35,7 +89,8 @@ export function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
           temasRecomendados?: unknown;
         };
 
-        if (!GRANDES_AREAS_VALIDAS.includes(item.area as GrandeArea)) {
+        const resolvedArea = resolveGrandeArea(item.area);
+        if (!resolvedArea) {
           return [];
         }
 
@@ -44,11 +99,9 @@ export function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
           : [];
 
         return [{
-          area: item.area as GrandeArea,
+          area: resolvedArea,
           diagnostico: typeof item.diagnostico === 'string' ? item.diagnostico : '',
-          grauPrioridade: PRIORIDADES_VALIDAS.includes(item.grauPrioridade as RespostaAnaliseIA['analiseAreas'][number]['grauPrioridade'])
-            ? item.grauPrioridade as RespostaAnaliseIA['analiseAreas'][number]['grauPrioridade']
-            : 'Atenção',
+          grauPrioridade: resolvePriority(item.grauPrioridade),
           temasRecomendados,
         }];
       })
@@ -59,10 +112,6 @@ export function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
     : [];
 
   const diagnosticoGeral = typeof source.diagnosticoGeral === 'string' ? source.diagnosticoGeral.trim() : '';
-
-  if (diagnosticoGeral.length === 0 && analiseAreas.length === 0 && planoDeAcao.length === 0) {
-    return null;
-  }
 
   return {
     diagnosticoGeral,
