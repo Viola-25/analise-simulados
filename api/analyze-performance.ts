@@ -59,6 +59,14 @@ function safeTempoPorQuestao(simulado: Partial<Simulado> | undefined) {
   return (tempoResolucaoMinutos * 60) / questoesTotais;
 }
 
+function sanitizeSimulados(simulados: unknown[]): Partial<Simulado>[] {
+  if (!Array.isArray(simulados)) {
+    return [];
+  }
+
+  return simulados.filter((simulado): simulado is Partial<Simulado> => Boolean(simulado && typeof simulado === 'object'));
+}
+
 function buildSimuladoSummary(simulado: Partial<Simulado>, index: number): string {
   const clinica = safeAreaStats(simulado, 'Clínica Médica');
   const cirurgia = safeAreaStats(simulado, 'Cirurgia Geral');
@@ -91,6 +99,8 @@ Simulado #${index + 1}:
 }
 
 function buildPrompt(perfil: any, simulados: Simulado[]): string {
+  const safeSimulados = sanitizeSimulados(simulados as unknown[]);
+
   return `Abaixo estão os dados de desempenho de um estudante do último ano de medicina (Internato) se preparando para a Residência Médica.
     
 DADOS DO PERFIL DO ALUNO:
@@ -102,8 +112,8 @@ DADOS DO PERFIL DO ALUNO:
 - Instituição Alvo: ${perfil?.instituicaoAlvo || 'Não especificada'}
 - Meta de aproveitamento geral: ${perfil?.metaAcertosPercentual || 80}%
 
-DADOS DOS SIMULADOS REALIZADOS (Últimos ${simulados.length} simulados, do mais antigo para o mais recente):
-${simulados.map((s, index) => buildSimuladoSummary(s, index)).join('\n')}
+DADOS DOS SIMULADOS REALIZADOS (Últimos ${safeSimulados.length} simulados, do mais antigo para o mais recente):
+${safeSimulados.map((s, index) => buildSimuladoSummary(s, index)).join('\n')}
 
 Faça uma análise estatística e diagnóstica médica altamente profissional e personalizada direcionada à aprovação na residência médica de ${perfil?.instituicaoAlvo || 'grande concorrência'}.
 Responda somente em JSON válido, sem texto fora do JSON.
@@ -182,8 +192,13 @@ async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<Resposta
 }
 
 export default async function handler(req: any, res: any) {
+  if (req.method === 'GET') {
+    res.status(405).setHeader('Allow', 'POST').json({ error: 'Método não permitido. Use POST.' });
+    return;
+  }
+
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Método não permitido.' });
+    res.status(405).setHeader('Allow', 'POST').json({ error: 'Método não permitido.' });
     return;
   }
 
