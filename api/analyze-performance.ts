@@ -217,6 +217,8 @@ function buildFallbackAnalysis(perfil: any, simulados: Simulado[]): RespostaAnal
     ],
     origemAnalise: 'fallback_local',
     envioParaIA: false,
+    statusAnalise: 'fallback_local',
+    tentativasIA: 0,
   };
 }
 
@@ -325,13 +327,18 @@ Você deve fornecer:
 Retorne rigorosamente no formato de dados estruturado padrão fornecido.`;
 }
 
-async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<RespostaAnaliseIA> {
-  if (!process.env.GROQ_API_KEY) {
-    return buildFallbackAnalysis(perfil, simulados);
-  }
+function buildRepairPrompt(rawResponse: string): string {
+  return `A resposta anterior veio incompleta ou fora do formato esperado.
+Converta o conteúdo abaixo para JSON válido e estritamente compatível com o schema esperado, sem adicionar texto fora do JSON.
+Se algum campo não puder ser inferido com segurança, preencha com strings vazias, arrays vazios ou valores neutros, mas mantenha a estrutura completa.
 
-  console.info(`[analyze-performance] Enviando ${simulados.length} simulados para a Groq using model ${GROQ_MODEL}`);
+CONTEÚDO BRUTO:
+${rawResponse}
 
+RETORNE SOMENTE O JSON FINAL.`;
+}
+
+async function requestGroqCompletion(userPrompt: string, temperature = 0.2) {
   const response = await fetch(GROQ_API_URL, {
     method: 'POST',
     headers: {
@@ -340,14 +347,28 @@ async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<Resposta
     },
     body: JSON.stringify({
       model: GROQ_MODEL,
-      temperature: 0.2,
+      temperature,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemInstruction },
-        { role: 'user', content: buildPrompt(perfil, simulados) },
+        { role: 'user', content: userPrompt },
       ],
     }),
   });
+
+  return response;
+}
+
+async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<RespostaAnaliseIA> {
+  if (!process.env.GROQ_API_KEY) {
+    return buildFallbackAnalysis(perfil, simulados);
+  }
+
+  console.info(`[analyze-performance] Enviando ${simulados.length} simulados para a Groq using model ${GROQ_MODEL}`);
+  let groqAttempts = 0;
+
+  const response = await requestGroqCompletion(buildPrompt(perfil, simulados), 0.2);
+  groqAttempts += 1;
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -365,28 +386,125 @@ async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<Resposta
 
   const responseText = responseData.choices?.[0]?.message?.content;
   if (!responseText) {
-    console.warn('[analyze-performance] Resposta da Groq vazia. Usando fallback local.');
-    return buildFallbackAnalysis(perfil, simulados);
+    console.warn('[analyze-performance] Resposta da Groq vazia. Tentando reparo antes do fallback local.');
+    const repairResponse = await requestGroqCompletion(buildRepairPrompt('RESPOSTA VAZIA'), 0);
+    const repairData = await repairResponse.json() as {
+      choices?: Array<{
+        message?: { content?: string | null };
+      }>;
+    };
+
+    const repairText = repairData.choices?.[0]?.message?.content;
+    if (!repairText) {
+      return buildFallbackAnalysis(perfil, simulados);
+    }
+
+    let repairPayload: unknown;
+    try {
+      repairPayload = JSON.parse(extractJsonPayload(repairText));
+    } catch (error: any) {
+      console.warn(`[analyze-performance] Reparo ainda inválido: ${error?.message || String(error)}. Usando fallback local.`);
+      return buildFallbackAnalysis(perfil, simulados);
+    }
+
+    const repaired = normalizeAiAnalysis(repairPayload);
+    if (!isMeaningfulAnalysis(repaired)) {
+      return buildFallbackAnalysis(perfil, simulados);
+    }
+
+    return {
+      ...repaired,
+      origemAnalise: 'groq',
+      envioParaIA: true,
+      statusAnalise: 'groq_reparada',
+      tentativasIA: groqAttempts,
+    };
   }
 
   let parsedPayload: unknown;
   try {
     parsedPayload = JSON.parse(extractJsonPayload(responseText));
   } catch (error: any) {
-    console.warn(`[analyze-performance] JSON inválido da Groq: ${error?.message || String(error)}. Usando fallback local.`);
-    return buildFallbackAnalysis(perfil, simulados);
+    console.warn(`[analyze-performance] JSON inválido da Groq: ${error?.message || String(error)}. Tentando reparo.`);
+
+    const repairResponse = await requestGroqCompletion(buildRepairPrompt(responseText), 0);
+    const repairData = await repairResponse.json() as {
+      choices?: Array<{
+        message?: { content?: string | null };
+      }>;
+    };
+
+    const repairText = repairData.choices?.[0]?.message?.content;
+    if (!repairText) {
+      return buildFallbackAnalysis(perfil, simulados);
+    }
+
+    let repairPayload: unknown;
+    try {
+      repairPayload = JSON.parse(extractJsonPayload(repairText));
+    } catch (repairError: any) {
+      console.warn(`[analyze-performance] Reparo inválido: ${repairError?.message || String(repairError)}. Usando fallback local.`);
+      return buildFallbackAnalysis(perfil, simulados);
+    }
+
+    const repaired = normalizeAiAnalysis(repairPayload);
+    if (!isMeaningfulAnalysis(repaired)) {
+      return buildFallbackAnalysis(perfil, simulados);
+    }
+
+    return {
+      ...repaired,
+      origemAnalise: 'groq',
+      envioParaIA: true,
+      statusAnalise: 'groq_reparada',
+      tentativasIA: groqAttempts,
+    };
   }
 
   const parsed = normalizeAiAnalysis(parsedPayload);
   if (!isMeaningfulAnalysis(parsed)) {
-    console.warn('[analyze-performance] Payload da IA sem conteúdo útil. Usando fallback local.');
-    return buildFallbackAnalysis(perfil, simulados);
+    console.warn('[analyze-performance] Payload da IA sem conteúdo útil. Tentando reparo antes do fallback local.');
+
+    const repairResponse = await requestGroqCompletion(buildRepairPrompt(responseText), 0);
+    const repairData = await repairResponse.json() as {
+      choices?: Array<{
+        message?: { content?: string | null };
+      }>;
+    };
+
+    const repairText = repairData.choices?.[0]?.message?.content;
+    if (!repairText) {
+      return buildFallbackAnalysis(perfil, simulados);
+    }
+
+    let repairPayload: unknown;
+    try {
+      repairPayload = JSON.parse(extractJsonPayload(repairText));
+    } catch (repairError: any) {
+      console.warn(`[analyze-performance] Reparo inválido: ${repairError?.message || String(repairError)}. Usando fallback local.`);
+      return buildFallbackAnalysis(perfil, simulados);
+    }
+
+    const repaired = normalizeAiAnalysis(repairPayload);
+    if (!isMeaningfulAnalysis(repaired)) {
+      return buildFallbackAnalysis(perfil, simulados);
+    }
+
+    return {
+      ...repaired,
+      origemAnalise: 'groq',
+      envioParaIA: true,
+      statusAnalise: 'groq_reparada',
+      tentativasIA: groqAttempts,
+    };
   }
 
   return {
     ...parsed,
     origemAnalise: 'groq',
+    statusAnalise: 'groq_ok',
     envioParaIA: true,
+    tentativasIA: groqAttempts,
   };
 }
 

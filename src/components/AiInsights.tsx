@@ -124,11 +124,27 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
       ? 'Gerado localmente como contingência'
       : 'Origem da análise não informada';
 
+  const statusLabel = analise?.statusAnalise === 'groq_ok'
+    ? 'Groq validada'
+    : analise?.statusAnalise === 'groq_reparada'
+      ? 'Groq reparada'
+      : analise?.statusAnalise === 'fallback_local'
+        ? 'Fallback local'
+        : 'Status indefinido';
+
   const originTone = analise?.origemAnalise === 'groq'
     ? 'text-emerald-300 border-emerald-500/20 bg-emerald-500/10'
     : analise?.origemAnalise === 'fallback_local'
       ? 'text-amber-300 border-amber-500/20 bg-amber-500/10'
       : 'text-slate-300 border-white/10 bg-white/5';
+
+  const statusTone = analise?.statusAnalise === 'groq_ok'
+    ? 'text-emerald-300 border-emerald-500/20 bg-emerald-500/10'
+    : analise?.statusAnalise === 'groq_reparada'
+      ? 'text-blue-300 border-blue-500/20 bg-blue-500/10'
+      : analise?.statusAnalise === 'fallback_local'
+        ? 'text-amber-300 border-amber-500/20 bg-amber-500/10'
+        : 'text-slate-300 border-white/10 bg-white/5';
 
   return (
     <div className="space-y-6" id="ai-insights-container">
@@ -203,9 +219,14 @@ export default function AiInsights({ simulados, perfil }: AiInsightsProps) {
                 <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
                   <Target size={16} className="text-blue-400" /> Diagnóstico de Tendência e Gestão Pedagógica
                 </h3>
-                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${originTone}`}>
-                  {originLabel}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${statusTone}`}>
+                    {statusLabel}
+                  </span>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${originTone}`}>
+                    {originLabel}
+                  </span>
+                </div>
               </div>
               <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-line font-sans border-l-4 border-blue-500 pl-4 py-1 italic">
                   {analise.diagnosticoGeral || 'A análise ainda não trouxe um diagnóstico textual.'}

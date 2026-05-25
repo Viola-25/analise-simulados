@@ -131,6 +131,8 @@ export interface RespostaAnaliseIA {
   }[];
   planoDeAcao: string[];
   origemAnalise?: 'groq' | 'fallback_local';
+  statusAnalise?: 'groq_ok' | 'groq_reparada' | 'fallback_local';
+  tentativasIA?: number;
   envioParaIA?: boolean;
 }
 
