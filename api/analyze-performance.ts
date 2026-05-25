@@ -27,6 +27,69 @@ function extractJsonPayload(content: string): string {
   return trimmed;
 }
 
+function safeNumber(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function safeAreaStats(simulado: Partial<Simulado> | undefined, area: GrandeArea) {
+  const desempenhoAreas = simulado?.desempenhoAreas;
+  const areaData = desempenhoAreas && typeof desempenhoAreas === 'object'
+    ? (desempenhoAreas as Record<string, { acertos?: unknown; total?: unknown }>)[area]
+    : undefined;
+
+  const acertos = safeNumber(areaData?.acertos, 0);
+  const total = safeNumber(areaData?.total, 0);
+  const percentual = total > 0 ? (acertos / total) * 100 : 0;
+
+  return { acertos, total, percentual };
+}
+
+function safePercentualAcertos(simulado: Partial<Simulado> | undefined) {
+  return safeNumber(simulado?.percentualAcertos, 0);
+}
+
+function safeTempoPorQuestao(simulado: Partial<Simulado> | undefined) {
+  const tempoResolucaoMinutos = safeNumber(simulado?.tempoResolucaoMinutos, 0);
+  const questoesTotais = safeNumber(simulado?.questoesTotais, 0);
+
+  if (tempoResolucaoMinutos <= 0 || questoesTotais <= 0) {
+    return 0;
+  }
+
+  return (tempoResolucaoMinutos * 60) / questoesTotais;
+}
+
+function buildSimuladoSummary(simulado: Partial<Simulado>, index: number): string {
+  const clinica = safeAreaStats(simulado, 'Clínica Médica');
+  const cirurgia = safeAreaStats(simulado, 'Cirurgia Geral');
+  const pediatria = safeAreaStats(simulado, 'Pediatria');
+  const go = safeAreaStats(simulado, 'Ginecologia e Obstetrícia');
+  const preventiva = safeAreaStats(simulado, 'Medicina Preventiva');
+  const acertosTotais = safeNumber(simulado.acertosTotais, 0);
+  const questoesTotais = safeNumber(simulado.questoesTotais, 0);
+  const percentualAcertos = safePercentualAcertos(simulado);
+  const tempoResolucaoMinutos = safeNumber(simulado.tempoResolucaoMinutos, 0);
+  const tempoPorQuestao = safeTempoPorQuestao(simulado);
+
+  return `
+Simulado #${index + 1}:
+  - Nome: ${simulado.nome || 'Simulado sem nome'}
+  - Data: ${simulado.data || 'Data não informada'}
+  - Desempenho Geral: ${acertosTotais} acertos de ${questoesTotais} questões (${percentualAcertos.toFixed(1)}%)
+  - Tempo de resolução: ${tempoResolucaoMinutos} minutos (médio de ${tempoPorQuestao.toFixed(1)} segundos por questão)
+  - Desempenho por Grande Área:
+    * Clínica Médica: ${clinica.acertos} de ${clinica.total} (${clinica.percentual.toFixed(1)}%)
+    * Cirurgia Geral: ${cirurgia.acertos} de ${cirurgia.total} (${cirurgia.percentual.toFixed(1)}%)
+    * Pediatria: ${pediatria.acertos} de ${pediatria.total} (${pediatria.percentual.toFixed(1)}%)
+    * Ginecologia e Obstetrícia: ${go.acertos} de ${go.total} (${go.percentual.toFixed(1)}%)
+    * Medicina Preventiva: ${preventiva.acertos} de ${preventiva.total} (${preventiva.percentual.toFixed(1)}%)
+  ${safeNumber(simulado.mediaParticipantes, NaN) ? `- Média geral dos outros participantes: ${simulado.mediaParticipantes} questões (${safeNumber(simulado.questoesTotais, 0) > 0 ? ((safeNumber(simulado.mediaParticipantes, 0) / safeNumber(simulado.questoesTotais, 1)) * 100).toFixed(1) : '0.0'}%)` : ''}
+  ${safeNumber(simulado.desvioPadrao, NaN) ? `- Desvio padrão da prova: ${simulado.desvioPadrao} questões` : ''}
+  ${safeNumber(simulado.percentilEstimado, NaN) ? `- Seu percentil estimado: ${safeNumber(simulado.percentilEstimado, 0).toFixed(1)}° percentil (você superou ${safeNumber(simulado.percentilEstimado, 0).toFixed(1)}% dos participantes)` : ''}
+  ${simulado.cadernoErros ? `- Observações/Erros anotados: "${simulado.cadernoErros}"` : ''}
+`;
+}
+
 function buildPrompt(perfil: any, simulados: Simulado[]): string {
   return `Abaixo estão os dados de desempenho de um estudante do último ano de medicina (Internato) se preparando para a Residência Médica.
     
@@ -40,23 +103,7 @@ DADOS DO PERFIL DO ALUNO:
 - Meta de aproveitamento geral: ${perfil?.metaAcertosPercentual || 80}%
 
 DADOS DOS SIMULADOS REALIZADOS (Últimos ${simulados.length} simulados, do mais antigo para o mais recente):
-${simulados.map((s, index) => `
-Simulado #${index + 1}:
-  - Nome: ${s.nome}
-  - Data: ${s.data}
-  - Desempenho Geral: ${s.acertosTotais} acertos de ${s.questoesTotais} questões (${s.percentualAcertos.toFixed(1)}%)
-  - Tempo de resolução: ${s.tempoResolucaoMinutos} minutos (médio de ${(s.tempoResolucaoMinutos * 60 / s.questoesTotais).toFixed(1)} segundos por questão)
-  - Desempenho por Grande Área:
-    * Clínica Médica: ${s.desempenhoAreas['Clínica Médica'].acertos} de ${s.desempenhoAreas['Clínica Médica'].total} (${(s.desempenhoAreas['Clínica Médica'].total ? s.desempenhoAreas['Clínica Médica'].acertos / s.desempenhoAreas['Clínica Médica'].total * 100 : 0).toFixed(1)}%)
-    * Cirurgia Geral: ${s.desempenhoAreas['Cirurgia Geral'].acertos} de ${s.desempenhoAreas['Cirurgia Geral'].total} (${(s.desempenhoAreas['Cirurgia Geral'].total ? s.desempenhoAreas['Cirurgia Geral'].acertos / s.desempenhoAreas['Cirurgia Geral'].total * 100 : 0).toFixed(1)}%)
-    * Pediatria: ${s.desempenhoAreas['Pediatria'].acertos} de ${s.desempenhoAreas['Pediatria'].total} (${(s.desempenhoAreas['Pediatria'].total ? s.desempenhoAreas['Pediatria'].acertos / s.desempenhoAreas['Pediatria'].total * 100 : 0).toFixed(1)}%)
-    * Ginecologia e Obstetrícia: ${s.desempenhoAreas['Ginecologia e Obstetrícia'].acertos} de ${s.desempenhoAreas['Ginecologia e Obstetrícia'].total} (${(s.desempenhoAreas['Ginecologia e Obstetrícia'].total ? s.desempenhoAreas['Ginecologia e Obstetrícia'].acertos / s.desempenhoAreas['Ginecologia e Obstetrícia'].total * 100 : 0).toFixed(1)}%)
-    * Medicina Preventiva: ${s.desempenhoAreas['Medicina Preventiva'].acertos} de ${s.desempenhoAreas['Medicina Preventiva'].total} (${(s.desempenhoAreas['Medicina Preventiva'].total ? s.desempenhoAreas['Medicina Preventiva'].acertos / s.desempenhoAreas['Medicina Preventiva'].total * 100 : 0).toFixed(1)}%)
-  ${s.mediaParticipantes ? `- Média geral dos outros participantes: ${s.mediaParticipantes} questões (${(s.mediaParticipantes / s.questoesTotais * 100).toFixed(1)}%)` : ''}
-  ${s.desvioPadrao ? `- Desvio padrão da prova: ${s.desvioPadrao} questões` : ''}
-  ${s.percentilEstimado ? `- Seu percentil estimado: ${s.percentilEstimado.toFixed(1)}° percentil (você superou ${s.percentilEstimado.toFixed(1)}% dos participantes)` : ''}
-  ${s.cadernoErros ? `- Observações/Erros anotados: "${s.cadernoErros}"` : ''}
-`).join('\n')}
+${simulados.map((s, index) => buildSimuladoSummary(s, index)).join('\n')}
 
 Faça uma análise estatística e diagnóstica médica altamente profissional e personalizada direcionada à aprovação na residência médica de ${perfil?.instituicaoAlvo || 'grande concorrência'}.
 Responda somente em JSON válido, sem texto fora do JSON.
@@ -110,12 +157,25 @@ async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<Resposta
 
   const responseText = responseData.choices?.[0]?.message?.content;
   if (!responseText) {
-    throw new Error('A resposta gerada pela IA está vazia.');
+    const error = new Error('A resposta gerada pela IA está vazia.');
+    error.name = 'EmptyGroqResponseError';
+    throw error;
   }
 
-  const parsed = normalizeAiAnalysis(JSON.parse(extractJsonPayload(responseText)));
+  let parsedPayload: unknown;
+  try {
+    parsedPayload = JSON.parse(extractJsonPayload(responseText));
+  } catch (error: any) {
+    const parseError = new Error(`A resposta da IA não veio em JSON válido: ${error?.message || String(error)}`);
+    parseError.name = 'InvalidGroqJsonError';
+    throw parseError;
+  }
+
+  const parsed = normalizeAiAnalysis(parsedPayload);
   if (!parsed) {
-    throw new Error('A resposta da IA veio vazia ou em um formato inválido.');
+    const error = new Error('A resposta da IA veio vazia ou em um formato inválido.');
+    error.name = 'InvalidGroqPayloadError';
+    throw error;
   }
 
   return parsed;
@@ -140,10 +200,16 @@ export default async function handler(req: any, res: any) {
   } catch (error: any) {
     console.error('Error during AI analysis:', error);
     const message = error?.message || String(error);
-    const statusCode = error?.name === 'MissingGroqApiKeyError' ? 503 : 500;
+    const statusCode = error?.name === 'MissingGroqApiKeyError'
+      ? 503
+      : error?.name === 'InvalidGroqJsonError' || error?.name === 'InvalidGroqPayloadError' || error?.name === 'EmptyGroqResponseError'
+        ? 502
+        : 500;
     res.status(statusCode).json({
       error: statusCode === 503
         ? 'A análise de IA não está disponível porque a chave da Groq não foi configurada neste ambiente.'
+        : statusCode === 502
+          ? 'A IA respondeu em um formato inesperado. Tente novamente em instantes.'
         : 'Ocorreu um erro no processamento da análise de IA. Contudo, suas estatísticas locais continuam disponíveis.',
       details: message,
     });
