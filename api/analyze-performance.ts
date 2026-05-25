@@ -4,7 +4,6 @@
  */
 
 import { GrandeArea, RespostaAnaliseIA, Simulado } from '../src/types';
-import { normalizeAiAnalysis } from '../src/utils/aiAnalysis';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -25,6 +24,62 @@ function extractJsonPayload(content: string): string {
   }
 
   return trimmed;
+}
+
+function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const source = input as Partial<RespostaAnaliseIA> & {
+    analiseAreas?: unknown;
+    planoDeAcao?: unknown;
+  };
+
+  const analiseAreas = Array.isArray(source.analiseAreas)
+    ? source.analiseAreas.flatMap((area) => {
+        if (!area || typeof area !== 'object') {
+          return [];
+        }
+
+        const item = area as Partial<RespostaAnaliseIA['analiseAreas'][number]> & {
+          temasRecomendados?: unknown;
+        };
+
+        if (item.area !== 'Clínica Médica' && item.area !== 'Cirurgia Geral' && item.area !== 'Pediatria' && item.area !== 'Ginecologia e Obstetrícia' && item.area !== 'Medicina Preventiva') {
+          return [];
+        }
+
+        const temasRecomendados = Array.isArray(item.temasRecomendados)
+          ? item.temasRecomendados.filter((tema): tema is string => typeof tema === 'string' && tema.trim().length > 0)
+          : [];
+
+        return [{
+          area: item.area,
+          diagnostico: typeof item.diagnostico === 'string' ? item.diagnostico : '',
+          grauPrioridade: item.grauPrioridade === 'Crítico' || item.grauPrioridade === 'Atenção' || item.grauPrioridade === 'Adequado' || item.grauPrioridade === 'Excelente'
+            ? item.grauPrioridade
+            : 'Atenção',
+          temasRecomendados,
+        }];
+      })
+    : [];
+
+  const planoDeAcao = Array.isArray(source.planoDeAcao)
+    ? source.planoDeAcao.filter((passo): passo is string => typeof passo === 'string' && passo.trim().length > 0)
+    : [];
+
+  const diagnosticoGeral = typeof source.diagnosticoGeral === 'string' ? source.diagnosticoGeral.trim() : '';
+
+  if (diagnosticoGeral.length === 0 && analiseAreas.length === 0 && planoDeAcao.length === 0) {
+    return null;
+  }
+
+  return {
+    diagnosticoGeral,
+    analiseAreas,
+    planoDeAcao,
+  };
 }
 
 function safeNumber(value: unknown, fallback = 0): number {
