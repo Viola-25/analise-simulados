@@ -7,6 +7,13 @@ import { GrandeArea, RespostaAnaliseIA, Simulado } from '../src/types';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const GRANDES_AREAS: GrandeArea[] = [
+  'Clínica Médica',
+  'Cirurgia Geral',
+  'Pediatria',
+  'Ginecologia e Obstetrícia',
+  'Medicina Preventiva',
+];
 
 const systemInstruction = `Você é um professor e mentor especialista na preparação para a Residência Médica (equivalente a um coordenador pedagógico de grandes cursinhos como Medgrupo, Medcel, Sanar, Afya, etc.).
 Sua missão é dar uma análise diagnóstica extremamente acolhedora porém exigente e cientificamente embasada em evidências de medicina e andragogia para aprovação do interno no final do ano na especialidade alvo dele.
@@ -131,6 +138,92 @@ function normalizeAiAnalysis(input: unknown): RespostaAnaliseIA | null {
   };
 }
 
+function getAreaThemes(area: GrandeArea): string[] {
+  switch (area) {
+    case 'Clínica Médica':
+      return ['Hipertensão Arterial Sistêmica', 'Diabetes Mellitus', 'Pneumonia Comunitária', 'Insuficiência Cardíaca', 'Distúrbios Ácido-Básicos'];
+    case 'Cirurgia Geral':
+      return ['Abdome Agudo', 'Hérnias da Parede Abdominal', 'Trauma Abdominal', 'Pós-Operatório', 'Hemorragia Digestiva Alta'];
+    case 'Pediatria':
+      return ['Crescimento e Desenvolvimento', 'Infecções de Vias Aéreas', 'Asma na Infância', 'Imunização', 'Infecção Urinária na Infância'];
+    case 'Ginecologia e Obstetrícia':
+      return ['Pré-natal de baixo risco', 'Distócia de Ombro', 'Sangramento Uterino Anormal', 'Planejamento Familiar', 'Trabalho de Parto'];
+    case 'Medicina Preventiva':
+      return ['Epidemiologia e Incidência', 'Sensibilidade e Especificidade', 'Estudos de Coorte', 'Ensaios Clínicos', 'Rastreamento'];
+  }
+}
+
+function buildFallbackAnalysis(perfil: any, simulados: Simulado[]): RespostaAnaliseIA {
+  const safeSimulados = sanitizeSimulados(simulados as unknown[]);
+
+  const totalAcertos = safeSimulados.reduce((sum, simulado) => sum + safeNumber(simulado.acertosTotais, 0), 0);
+  const totalQuestoes = safeSimulados.reduce((sum, simulado) => sum + safeNumber(simulado.questoesTotais, 0), 0);
+  const overallPercentual = totalQuestoes > 0 ? (totalAcertos / totalQuestoes) * 100 : 0;
+
+  const areaTotals: Record<GrandeArea, { acertos: number; total: number }> = {
+    'Clínica Médica': { acertos: 0, total: 0 },
+    'Cirurgia Geral': { acertos: 0, total: 0 },
+    'Pediatria': { acertos: 0, total: 0 },
+    'Ginecologia e Obstetrícia': { acertos: 0, total: 0 },
+    'Medicina Preventiva': { acertos: 0, total: 0 },
+  };
+
+  safeSimulados.forEach((simulado) => {
+    GRANDES_AREAS.forEach((area) => {
+      const areaStats = safeAreaStats(simulado, area);
+      areaTotals[area].acertos += areaStats.acertos;
+      areaTotals[area].total += areaStats.total;
+    });
+  });
+
+  const analiseAreas = GRANDES_AREAS.map((area) => {
+    const areaStats = areaTotals[area];
+    const percentual = areaStats.total > 0 ? (areaStats.acertos / areaStats.total) * 100 : 0;
+    const grauPrioridade: RespostaAnaliseIA['analiseAreas'][number]['grauPrioridade'] = percentual < 60
+      ? 'Crítico'
+      : percentual < 75
+        ? 'Atenção'
+        : percentual < 85
+          ? 'Adequado'
+          : 'Excelente';
+
+    return {
+      area,
+      diagnostico: `Desempenho agregado em ${area} de ${percentual.toFixed(1)}%. Priorize revisão dirigida dos temas mais cobrados e reforce questões comentadas para reduzir perdas por detalhe.`,
+      grauPrioridade,
+      temasRecomendados: getAreaThemes(area),
+    };
+  });
+
+  const firstPercentual = safeSimulados[0] && safeSimulados[0].questoesTotais ? (safeNumber(safeSimulados[0].acertosTotais, 0) / safeNumber(safeSimulados[0].questoesTotais, 1)) * 100 : 0;
+  const lastPercentual = safeSimulados.length > 0 && safeSimulados[safeSimulados.length - 1].questoesTotais
+    ? (safeNumber(safeSimulados[safeSimulados.length - 1].acertosTotais, 0) / safeNumber(safeSimulados[safeSimulados.length - 1].questoesTotais, 1)) * 100
+    : 0;
+  const trendDelta = lastPercentual - firstPercentual;
+  const trendText = safeSimulados.length >= 2
+    ? trendDelta >= 0
+      ? `houve melhora de ${trendDelta.toFixed(1)} pontos percentuais entre o primeiro e o último simulado registrado`
+      : `houve queda de ${Math.abs(trendDelta).toFixed(1)} pontos percentuais entre o primeiro e o último simulado registrado`
+    : 'há poucos simulados para medir tendência temporal com precisão';
+
+  return {
+    diagnosticoGeral: `Diagnóstico provisório gerado localmente com base no histórico salvo: ${overallPercentual.toFixed(1)}% de aproveitamento geral. ${trendText}. Use este bloco como contingência até a IA voltar a responder com conteúdo estruturado.`,
+    analiseAreas,
+    planoDeAcao: [
+      'Revisar o caderno de erros primeiro, transformando cada erro em uma pergunta e resposta curta.',
+      'Fazer 20 a 30 questões por dia nas áreas com pior percentual e revisar os comentários.',
+      'Revisar os temas críticos em ciclos de 7 e 14 dias para consolidar retenção.',
+      'Comparar desempenho entre o primeiro e o último simulado para acompanhar tendência real.',
+    ],
+    origemAnalise: 'fallback_local',
+    envioParaIA: false,
+  };
+}
+
+function isMeaningfulAnalysis(value: RespostaAnaliseIA | null) {
+  return Boolean(value && value.diagnosticoGeral.trim().length > 0 && value.analiseAreas.length > 0 && value.planoDeAcao.length > 0);
+}
+
 function safeNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
@@ -234,10 +327,10 @@ Retorne rigorosamente no formato de dados estruturado padrão fornecido.`;
 
 async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<RespostaAnaliseIA> {
   if (!process.env.GROQ_API_KEY) {
-    const error = new Error('GROQ_API_KEY não configurada.');
-    error.name = 'MissingGroqApiKeyError';
-    throw error;
+    return buildFallbackAnalysis(perfil, simulados);
   }
+
+  console.info(`[analyze-performance] Enviando ${simulados.length} simulados para a Groq using model ${GROQ_MODEL}`);
 
   const response = await fetch(GROQ_API_URL, {
     method: 'POST',
@@ -258,7 +351,8 @@ async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<Resposta
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Groq respondeu com erro ${response.status}: ${errorText}`);
+    console.warn(`[analyze-performance] Groq respondeu com erro ${response.status}: ${errorText}`);
+    return buildFallbackAnalysis(perfil, simulados);
   }
 
   const responseData = await response.json() as {
@@ -271,28 +365,29 @@ async function runAnalysis(perfil: any, simulados: Simulado[]): Promise<Resposta
 
   const responseText = responseData.choices?.[0]?.message?.content;
   if (!responseText) {
-    const error = new Error('A resposta gerada pela IA está vazia.');
-    error.name = 'EmptyGroqResponseError';
-    throw error;
+    console.warn('[analyze-performance] Resposta da Groq vazia. Usando fallback local.');
+    return buildFallbackAnalysis(perfil, simulados);
   }
 
   let parsedPayload: unknown;
   try {
     parsedPayload = JSON.parse(extractJsonPayload(responseText));
   } catch (error: any) {
-    const parseError = new Error(`A resposta da IA não veio em JSON válido: ${error?.message || String(error)}`);
-    parseError.name = 'InvalidGroqJsonError';
-    throw parseError;
+    console.warn(`[analyze-performance] JSON inválido da Groq: ${error?.message || String(error)}. Usando fallback local.`);
+    return buildFallbackAnalysis(perfil, simulados);
   }
 
   const parsed = normalizeAiAnalysis(parsedPayload);
-  if (!parsed) {
-    const error = new Error('A resposta da IA veio vazia ou em um formato inválido.');
-    error.name = 'InvalidGroqPayloadError';
-    throw error;
+  if (!isMeaningfulAnalysis(parsed)) {
+    console.warn('[analyze-performance] Payload da IA sem conteúdo útil. Usando fallback local.');
+    return buildFallbackAnalysis(perfil, simulados);
   }
 
-  return parsed;
+  return {
+    ...parsed,
+    origemAnalise: 'groq',
+    envioParaIA: true,
+  };
 }
 
 export default async function handler(req: any, res: any) {
@@ -319,17 +414,8 @@ export default async function handler(req: any, res: any) {
   } catch (error: any) {
     console.error('Error during AI analysis:', error);
     const message = error?.message || String(error);
-    const statusCode = error?.name === 'MissingGroqApiKeyError'
-      ? 503
-      : error?.name === 'InvalidGroqJsonError' || error?.name === 'InvalidGroqPayloadError' || error?.name === 'EmptyGroqResponseError'
-        ? 502
-        : 500;
-    res.status(statusCode).json({
-      error: statusCode === 503
-        ? 'A análise de IA não está disponível porque a chave da Groq não foi configurada neste ambiente.'
-        : statusCode === 502
-          ? 'A IA respondeu em um formato inesperado. Tente novamente em instantes.'
-        : 'Ocorreu um erro no processamento da análise de IA. Contudo, suas estatísticas locais continuam disponíveis.',
+    res.status(500).json({
+      error: 'Ocorreu um erro no processamento da análise de IA. Contudo, suas estatísticas locais continuam disponíveis.',
       details: message,
     });
   }

@@ -130,6 +130,8 @@ export interface RespostaAnaliseIA {
     temasRecomendados: string[];
   }[];
   planoDeAcao: string[];
+  origemAnalise?: 'groq' | 'fallback_local';
+  envioParaIA?: boolean;
 }
 
 export interface UserAppDataRecord {
